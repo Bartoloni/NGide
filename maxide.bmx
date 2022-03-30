@@ -3,7 +3,7 @@
 ' BlitzMax native integrated development environment
 
 ' Copyright (c) 2005-2014 Simon Armstrong, Blitz Research Limited
-' Copyright (c) 2015-2020 Bruce A Henderson
+' Copyright (c) 2015-2022 Bruce A Henderson
 
 ' Permission is hereby granted, free of charge, to any person obtaining a copy
 ' of this software and associated documentation files (the "Software"), to deal
@@ -773,7 +773,9 @@ Type TAboutRequester Extends TRequester
 ?x64
 		arch = "x64"
 ?arm
-		arch = "ARM"
+		arch = "arm"
+?arm64
+		arch = "arm64"
 ?
 		abt.lblTitle = CreateLabel(IDE_NAME + " " + IDE_VERSION + " (" + arch + ")",ScaledSize(6),ScaledSize(y),w,ScaledSize(22),win,LABEL_LEFT)
 		SetGadgetFont abt.lblTitle, LookupGuiFont( GUIFONT_SYSTEM, 12, FONT_BOLD )
@@ -7733,6 +7735,9 @@ Type TCodePlay
 			Case MENUWIN32ENABLED, MENULINUXENABLED
 				EnableMenu x86enable
 				EnableMenu x64enable
+
+				EnableMenu armenable
+				EnableMenu arm64enable
 			Case MENUMACOSXENABLED
 ?Not ppc
 				EnableMenu x86enable
@@ -7812,6 +7817,12 @@ Type TCodePlay
 ?x64
 				CheckMenu x64enable
 				architectureenabled[MENUX64ENABLED - ARCHITECTUREOFFSET] = True
+?arm
+				CheckMenu armenable
+				architectureenabled[MENUARMENABLED - ARCHITECTUREOFFSET] = True
+?arm64
+				CheckMenu arm64enable
+				architectureenabled[MENUARM64ENABLED - ARCHITECTUREOFFSET] = True
 ?
 			Case MENUMACOSXENABLED
 ?x86
