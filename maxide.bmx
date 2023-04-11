@@ -1304,6 +1304,7 @@ Const QUOTED=2
 Const KEYWORD=3
 Const NUMBER=4
 Const MATCHING=5
+Const ERROR=6
 
 Type TOptionsRequester Extends TPanelRequester
 ' panels
@@ -1374,6 +1375,7 @@ Type TOptionsRequester Extends TPanelRequester
 		styles[KEYWORD].set( $ffff00,0 )
 		styles[NUMBER].set( $40ffff,0 )
 		styles[MATCHING].set( $ff4040,TEXTFORMAT_BOLD )
+		styles[ERROR].set( $ff2020,TEXTFORMAT_BOLD )
 		outputstyle.set(0,-1,GUIFONT_MONOSPACED)
 		outputLineNumberStyle.set(0,$ededed, False)
 		navstyle.set(0,-1,GUIFONT_SYSTEM)
@@ -1405,6 +1407,7 @@ Type TOptionsRequester Extends TPanelRequester
 		stream.WriteLine "keyword_style="+styles[KEYWORD].ToString()
 		stream.WriteLine "number_style="+styles[NUMBER].ToString()
 		stream.WriteLine "matched_style="+styles[MATCHING].ToString()
+		stream.WriteLine "error_style="+styles[ERROR].ToString()
 		stream.WriteLine "console_style="+outputstyle.ToString()	'Renamed from 'output_style' to bump users to default monospace font.
 		stream.WriteLine "console_linenumber_style="+outputLineNumberStyle.ToString()
 		stream.WriteLine "navi_style="+navstyle.ToString()	'Renamed from 'nav_style' to bump users to default treeview font.
@@ -1448,6 +1451,7 @@ Type TOptionsRequester Extends TPanelRequester
 				Case "keyword_style" styles[KEYWORD].FromString(b)
 				Case "number_style" styles[NUMBER].FromString(b)
 				Case "matched_style" styles[MATCHING].FromString(b)
+				Case "error_style" styles[ERROR].FromString(b)
 				Case "console_style" outputstyle.FromString(b)	'Renamed from 'output_style' to bump users to default monospace font.
 				Case "console_linenumber_style" outputLineNumberStyle.FromString(b)
 				Case "navi_style" navstyle.FromString(b)	'Renamed from 'nav_style' to bump users to default treeview font.
@@ -1522,6 +1526,7 @@ Type TOptionsRequester Extends TPanelRequester
 		styles[NUMBER].format(textarea,36,1)
 		styles[KEYWORD].format(textarea,39,5)
 		styles[QUOTED].format(textarea,46,10)
+		styles[ERROR].format(textarea,85,6)
 		lineNumberStyle.Refresh
 		TextAreaSetLineNumberBackColor textarea, lineNumberStyle.bg.red, lineNumberStyle.bg.green, lineNumberStyle.bg.blue
 		TextAreaSetLineNumberForeColor textarea, lineNumberStyle.fg.red, lineNumberStyle.fg.green, lineNumberStyle.fg.blue
@@ -1671,7 +1676,7 @@ Type TOptionsRequester Extends TPanelRequester
 
 	Method InitOptionsRequester(host:TCodePlay)
 		Local	w:TGadget
-		InitPanelRequester(host,"{{options_window_title}}", ScaledSize(420), ScaledSize(530))
+		InitPanelRequester(host,"{{options_window_title}}", ScaledSize(420), ScaledSize(564))
 ' init values
 		editcolor=New TColor
 ' init gadgets
@@ -1711,19 +1716,20 @@ Type TOptionsRequester Extends TPanelRequester
 			AddGadgetItem tabbutton,"{{options_editor_itemlabel_tabsize}} "+(i*2),GADGETITEM_LOCALIZED
 		Next
 
-		styles=New TTextStyle[6]
+		styles=New TTextStyle[7]
 		styles[NORMAL]=TTextStyle.Create("{{options_editor_label_plaintext}}:",ScaledSize(6),ScaledSize(70),w)
 		styles[COMMENT]=TTextStyle.Create("{{options_editor_label_remarks}}:",ScaledSize(6),ScaledSize(104),w)
 		styles[QUOTED]=TTextStyle.Create("{{options_editor_label_strings}}:",ScaledSize(6),ScaledSize(138),w)
 		styles[KEYWORD]=TTextStyle.Create("{{options_editor_label_keywords}}:",ScaledSize(6),ScaledSize(172),w)
 		styles[NUMBER]=TTextStyle.Create("{{options_editor_label_numbers}}:",ScaledSize(6),ScaledSize(206),w)
 		styles[MATCHING]=TTextStyle.Create("{{options_editor_label_matchings}}:",ScaledSize(6),ScaledSize(240),w)
+		styles[ERROR]=TTextStyle.Create("{{options_editor_label_errors}}:",ScaledSize(6),ScaledSize(274),w)
 
-		caretstyle = TCaretStyle.Create("{{options_editor_label_caret}}:",ScaledSize(6),ScaledSize(274),w)
-		lineNumberStyle = TLineNumberStyle.Create("{{options_editor_label_line_number}}:",ScaledSize(6),ScaledSize(308),w)
+		caretstyle = TCaretStyle.Create("{{options_editor_label_caret}}:",ScaledSize(6),ScaledSize(308),w)
+		lineNumberStyle = TLineNumberStyle.Create("{{options_editor_label_line_number}}:",ScaledSize(6),ScaledSize(342),w)
 
-		textarea=CreateTextArea(ScaledSize(6),ScaledSize(342),ClientWidth(w)-ScaledSize(12),ClientHeight(w)-ScaledSize(250),w,TEXTAREA_READONLY)
-		SetGadgetText textarea,"'Sample Code~n~nresult = ((2.0 * 4) + 1)~nPrint( ~qResult: ~q + result )~n"
+		textarea=CreateTextArea(ScaledSize(6),ScaledSize(376),ClientWidth(w)-ScaledSize(12),ClientHeight(w)-ScaledSize(250),w,TEXTAREA_READONLY)
+		SetGadgetText textarea,"'Sample Code~n~nresult = ((2.0 * 4) + 1)~nPrint( ~qResult: ~q + result )~nLocal s:String = ~qhello"
 
 		w=toolpanel
 		outputstyle=TGadgetStyle.Create("{{options_tools_label_output}}: ",ScaledSize(6),ScaledSize(6),w)
@@ -4597,6 +4603,8 @@ Type TOpenCode Extends TToolPanel
 					Local style:TTextStyle = host.options.styles[i]
 					TextAreaSetHighlightStyle(textarea, i, style.flags, style.color.red, style.color.green, style.color.blue)
 				Next
+				Local style:TTextStyle = host.options.styles[ERROR]
+				TextAreaSetHighlightStyle(textarea, 5, style.flags, style.color.red, style.color.green, style.color.blue)
 			End If
 		End If
 
