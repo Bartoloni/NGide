@@ -4074,7 +4074,7 @@ Type TOutputPanel Extends TToolPanel	'used build and run
 
 		bytes=pipe.ReadPipe()
 		If bytes
-			line$=String.FromBytes(bytes,Len bytes)
+			line$=String.FromUTF8Bytes(bytes,Len bytes)
 			line=line.Replace(Chr(13),"")
 			Write line
 		EndIf
