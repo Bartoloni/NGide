@@ -2354,10 +2354,10 @@ Type THelpPanel Extends TToolPanel
 		EndIf
 	End Method
 
-	Method Go(url$,internal=False)
+	Method Go(url$,isInternal=False)
 		Local	node:TNode
 
-		If host.options.externalhelp And Not internal
+		If host.options.externalhelp And Not isInternal
 			PollSystem
 			OpenURL url
 			MinimizeWindow host.window
