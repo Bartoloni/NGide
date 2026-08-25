@@ -4688,7 +4688,8 @@ Type TOpenCode Extends TToolPanel
 		While pos>=0
 			p=src.Find(token,pos)
 			If p=-1 Exit
-			c=10 If p>0 c=src[p-1]
+			c=10
+			If p>0 c=src[p-1]
 			If isntalphanumeric(c)
 				If p+n<src.length c=src[p+n]
 				If isntalphanumeric(c)
