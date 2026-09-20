@@ -1,4 +1,5 @@
-MaxIDE
-======
+NGide
 
-BlitzMax development environment.
+revamp of old MaxIde .. improved speed... 
+
+ONLY WINDOWS
