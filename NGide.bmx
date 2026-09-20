@@ -47,8 +47,6 @@ Import brl.timerdefault
 Import brl.maxutil
 Import brl.stringbuilder
 Import "file64.o"
-Incbin "bmxlogo.png"
-Incbin "toolbar.png"
 Incbin "splash.png"
 Incbin "default.language.ini"
 
@@ -192,32 +190,6 @@ Const MENUMINI_PANEL=182
 Const MENUMINI_LINES=183
 Const MENURECENT=256
 
-Const TB_NEW=0
-Const TB_OPEN=1
-Const TB_CLOSE=2
-Const TB_SAVE=3
-'spacer=4
-Const TB_CUT=5
-Const TB_COPY=6
-Const TB_PASTE=7
-Const TB_FIND=8
-'spacer=9
-Const TB_BUILD=10
-Const TB_BUILDRUN=11
-Const TB_STEP=12
-Const TB_STEPIN=13
-Const TB_STEPOUT=14
-Const TB_STOP=15
-'spacer=16
-Const TB_HOME=17
-Const TB_BACK=18
-Const TB_FORWARDS=19
-'spacer=20
-Const TB_LOCKOPEN=21
-Const TB_LOCKGOTO=22
-'toggle state elements:
-Const TB_CONTINUE=23
-Const TB_LOCKCLOSED=24
 
 Const TAB$=Chr(9)
 Const QUOTES$=Chr(34)
@@ -543,9 +515,7 @@ End Type
 
 Type TAboutRequester Extends TRequester
 
-	Global pixLogo:TPixmap
-
-	Field pnlLogo:TGadget, lblTitle:TGadget, lblSubtitle:TGadget
+	Field lblTitle:TGadget, lblSubtitle:TGadget
 	Field lblLeftAligned:TGadget[], lblRightAligned:TGadget[]
 	Field hypBlitz:TGadget
 
@@ -705,14 +675,10 @@ Type TAboutRequester Extends TRequester
 
 		Local win:TGadget = abt.window, w = ClientWidth(abt.window)-ScaledSize(12), h = ClientHeight(abt.window)
 
-		abt.pnlLogo = CreatePanel(w-ScaledSize(64-6),0,ScaledSize(64),ScaledSize(64),win)
-		SetGadgetLayout abt.pnlLogo, EDGE_CENTERED, EDGE_ALIGNED, EDGE_ALIGNED, EDGE_CENTERED
-
-		'abt.pnlLogo = CreatePanel(0,0,64,64,win)
-		'SetGadgetLayout abt.pnlLogo, EDGE_ALIGNED, EDGE_CENTERED, EDGE_ALIGNED, EDGE_CENTERED
-
-		If Not pixLogo Then pixLogo = LoadPixmapPNG("incbin::bmxlogo.png")
-		SetGadgetPixmap abt.pnlLogo, pixLogo, PANELPIXMAP_CENTER
+		' Usa la stessa risorsa dell'icona del programma anche nell'About.
+		' In questo modo bmxlogo.png non e' piu' necessario.
+		Local aboutIcon:TGadget = CreatePanel(ScaledSize(6),ScaledSize(8),ScaledSize(48),ScaledSize(48),win)
+		SetPanelPixmap aboutIcon, LoadPixmapPNG("incbin::window_icon.png"), PANELPIXMAP_FIT
 
 		Local y = 12
 		Local arch:String
@@ -725,11 +691,11 @@ Type TAboutRequester Extends TRequester
 ?arm64
 		arch = "arm64"
 ?
-		abt.lblTitle = CreateLabel(IDE_NAME + " " + IDE_VERSION + " (" + arch + ")",ScaledSize(6),ScaledSize(y),w,ScaledSize(22),win,LABEL_LEFT)
+		abt.lblTitle = CreateLabel(IDE_NAME + " " + IDE_VERSION + " (" + arch + ")",ScaledSize(62),ScaledSize(y),w-ScaledSize(56),ScaledSize(22),win,LABEL_LEFT)
 		SetGadgetFont abt.lblTitle, LookupGuiFont( GUIFONT_SYSTEM, 12, FONT_BOLD )
 		SetGadgetLayout abt.lblTitle, EDGE_ALIGNED, EDGE_ALIGNED, EDGE_ALIGNED, EDGE_CENTERED
 		y:+23
-		abt.lblSubtitle = CreateLabel("{{about_label_subtitle}}",ScaledSize(6),ScaledSize(y),w,ScaledSize(22),win,LABEL_LEFT)
+		abt.lblSubtitle = CreateLabel("{{about_label_subtitle}}",ScaledSize(62),ScaledSize(y),w-ScaledSize(56),ScaledSize(22),win,LABEL_LEFT)
 		SetGadgetFont abt.lblSubtitle, LookupGuiFont( GUIFONT_SYSTEM, 10, FONT_ITALIC )
 		SetGadgetLayout abt.lblSubtitle, EDGE_ALIGNED, EDGE_ALIGNED, EDGE_ALIGNED, EDGE_CENTERED
 
@@ -1307,7 +1273,7 @@ Type TOptionsRequester Extends TPanelRequester
 	Method SetDefaults()
 		language=DEFAULT_LANGUAGEPATH
 		bracketmatching=True
-		showtoolbar=True
+		showtoolbar=False
 		restoreopenfiles=True
 		autocapitalize=True
 		syntaxhighlight=True
@@ -1642,6 +1608,7 @@ Type TOptionsRequester Extends TPanelRequester
 		w=optionspanel
 
 		buttons[0]=CreateButton("{{options_options_btn_showtoolbar}}",ScaledSize(6),ScaledSize(6),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
+		HideGadget buttons[0] ' legacy toolbar option removed
 		buttons[1]=CreateButton("{{options_options_btn_autorestore}}",ScaledSize(6),ScaledSize(34),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 		buttons[2]=CreateButton("{{options_options_btn_autocaps}}",ScaledSize(6),ScaledSize(60),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 		buttons[3]=CreateButton("{{options_options_btn_syntaxhighlight}}",ScaledSize(6),ScaledSize(86),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
@@ -5725,7 +5692,7 @@ Type TCodePlay
 
 
 	Field eventhandlers:TList=New TList
-	Field window:TGadget,menubar:TGadget,toolbar:TGadget,client:TGadget,tabbar:TGadget
+	Field window:TGadget,menubar:TGadget,client:TGadget,tabbar:TGadget
 	Field split:TSplitter
 	Field debugtree:TDebugTree
 
@@ -6108,7 +6075,7 @@ Type TCodePlay
 			debugcode=Null
 		EndIf
 		SetMode EDITMODE
-		If Not GadgetHidden(toolbar) Then RefreshToolbar()
+		RefreshToolbar()
 	End Method
 
 	Method DebugSource(path$,line,column)
@@ -6137,7 +6104,7 @@ Type TCodePlay
 			navbar.SelectView navtab
 		End Select
 		Mode=m
-		If Not GadgetHidden(toolbar) Then RefreshToolbar()
+		RefreshToolbar()
 	End Method
 
 	Method RefreshMenu()
@@ -6158,63 +6125,7 @@ Type TCodePlay
 	EndMethod
 
 	Method RefreshToolbar()
-		' NGide: la toolbar classica e' nascosta permanentemente.
-		' Evita decine di aggiornamenti Win32 inutili durante editing/build.
-		If GadgetHidden(toolbar) Then Return
-		Local	i
-' sourceedit buttons
-		If THelpPanel(CurrentPanel)
-			DisableGadgetItem toolbar,TB_CLOSE
-		Else
-			EnableGadgetItem toolbar,TB_CLOSE
-		EndIf
-		If TOpenCode(CurrentPanel)
-			EnableGadgetItem toolbar,TB_SAVE
-			For i=TB_CUT To TB_FIND
-				EnableGadgetItem toolbar,i
-			Next
-		Else
-			DisableGadgetItem toolbar,TB_SAVE
-			For i=TB_CUT To TB_FIND
-				DisableGadgetItem toolbar,i
-			Next
-		EndIf
-' debug buttons
-		If Mode = DEBUGMODE And debugtree.cancontinue Then
-			If GadgetItemIcon( toolbar, TB_BUILDRUN ) = TB_BUILDRUN Then
-				ModifyGadgetItem( toolbar, TB_BUILDRUN, "", GADGETITEM_LOCALIZED, TB_CONTINUE, "{{tb_continue}}" )
-			EndIf
-		Else
-			If GadgetItemIcon( toolbar, TB_BUILDRUN ) <> TB_BUILDRUN Then
-				ModifyGadgetItem( toolbar, TB_BUILDRUN, "", GADGETITEM_LOCALIZED, TB_BUILDRUN, "{{tb_buildrun}}" )
-			EndIf
-		EndIf
-		For i=TB_STEP To TB_STEPOUT
-			If Mode=DEBUGMODE And debugtree.cancontinue Then
-				EnableGadgetItem toolbar,i
-			Else
-				DisableGadgetItem toolbar,i
-			EndIf
-		Next
-' stop button
-		If output And output.process
-			EnableGadgetItem toolbar,TB_STOP
-		Else
-			DisableGadgetItem toolbar,TB_STOP
-		EndIf
-' locked build file buttons
-		If lockedpanel
-			EnableGadgetItem( toolbar, TB_LOCKGOTO)
-			If GadgetItemIcon( toolbar, TB_LOCKOPEN ) <> TB_LOCKCLOSED
-				ModifyGadgetItem( toolbar, TB_LOCKOPEN, "", GADGETITEM_LOCALIZED, TB_LOCKCLOSED, "{{tb_lockedbuildfile}}: " + lockedpanel.path )
-			EndIf
-		Else
-			DisableGadgetItem( toolbar, TB_LOCKGOTO)
-			If GadgetItemIcon( toolbar, TB_LOCKOPEN ) <> TB_LOCKOPEN
-				ModifyGadgetItem( toolbar, TB_LOCKOPEN, "", GADGETITEM_LOCALIZED, TB_LOCKOPEN, "{{tb_lockbuildfile}}" )
-			EndIf
-		EndIf
-
+		' NGide 1.05: legacy toolbar removed. Kept as no-op for existing refresh calls.
 	End Method
 
 	Method IsSourceOpen(path$)
@@ -6532,7 +6443,7 @@ Type TCodePlay
 			ShowGadget panel.panel
 			If panel.active activepanel=panel
 			HideGadget curr.panel
-			If Not GadgetHidden(toolbar) Then RefreshToolbar()
+			RefreshToolbar()
 		EndIf
 		currentpanel.Invoke TOOLSHOW
 	End Method
@@ -6647,56 +6558,8 @@ Type TCodePlay
 		SetGadgetShape progress,0,0,Max(1,Int(progressW*(0.1))),progressH;PollSystem
 		ReadConfig()
 
-		' Toolbar interna nascosta: usa sempre la strip base.
-		' Evita selezione/caricamento delle varianti HiDPI non visualizzate.
-		toolbar=CreateToolBar("incbin::toolbar.png",0,0,0,0,window )
-		' OTTIMIZZAZIONE NGide:
-		' la toolbar classica e' sempre nascosta, quindi non generiamo la seconda
-		' icon-strip in scala di grigi per i pulsanti disabilitati.
-		' Il gadget toolbar resta comunque esistente per la logica interna di MaxIDE.
-		Rem
-			Local disabledPixmap:TPixmap = LoadPixmap("incbin::toolbar.png")
-			For Local x:Int = 0 Until disabledPixmap.width
-				For Local y:Int = 0 Until disabledPixmap.height
-					Local c:Int = disabledPixmap.ReadPixel(x,y)
-					Local a:Int = (c Shr 24) & $ff
-					Local r:Int = (c Shr 16) & $ff
-					Local g:Int = (c Shr 8) & $ff
-					Local b:Int = c & $ff
-					'convert to grayscale
-					Local luminance:Float = Sqr(0.299 * r*r + 0.587 * g*g + 0.114 * b*b)
-					r = Min(255, Max(0, luminance + (r - luminance) * 0.1))
-					g = Min(255, Max(0, luminance + (g - luminance) * 0.1))
-					b = Min(255, Max(0, luminance + (b - luminance) * 0.1))
-					disabledPixmap.WritePixel(x,y, Int(a*0.4) * $1000000 + r * $10000 + g * $100 + b)
-				Next
-			Next
-			TWindowsToolbar(toolbar).SetDisabledIconstrip( LoadIconStrip(disabledPixmap) )
-		EndRem
 
-
-		'you cannot simply remove by "sprite index", so better just
-		'remove the last entry each time
-		'RemoveGadgetItem toolbar, TB_CONTINUE
-		'RemoveGadgetItem toolbar, TB_LOCKCLOSED
-		RemoveGadgetItem toolbar, CountGadgetItems(toolbar)-1
-		RemoveGadgetItem toolbar, CountGadgetItems(toolbar)-1
-
-		'Rem
-		SetToolBarTips toolbar, ["{{tb_new}}","{{tb_open}}","{{tb_close}}","{{tb_save}}", ..
-		                         "", ..
-		                         "{{tb_cut}}","{{tb_copy}}","{{tb_paste}}","{{tb_find}}", ..
-		                         "", ..
-		                         "{{tb_build}}","{{tb_buildrun}}","{{tb_step}}","{{tb_stepin}}","{{tb_stepout}}","{{tb_stop}}", ..
-		                         "", ..
-		                         "{{tb_home}}","{{tb_back}}","{{tb_forward}}", ..
-		                         "", ..
-		                         "{{tb_lockbuildfile}}", "{{tb_gotobuildfile}}"]
-		'End Rem
-
-		' La toolbar originale resta disponibile alla logica interna,
-		' ma viene sempre nascosta per mantenere una sola riga in alto.
-		HideGadget toolbar
+		' NGide 1.05: legacy MaxIDE toolbar completely removed.
 
 		If OutsideDesktop(winsize)
 			winsize.set(20,20,760,540)
@@ -6884,6 +6747,10 @@ Type TCodePlay
 
 		menu=WindowMenu(window)
 
+		' Comandi principali a sinistra
+		CreateMenu "[💾 SAVE]",MENUMINI_SAVE,menu
+		CreateMenu "[🚀 RUN]",MENUMINI_RUN,menu
+
 		file=CreateMenu("{{menu_file}}",0,menu)
 		CreateMenu "{{menu_file_new}}",MENUNEW,file,KEY_N,MENUMOD
 		CreateMenu "{{menu_file_open}}",MENUOPEN,file,KEY_O,MENUMOD
@@ -7007,9 +6874,7 @@ Type TCodePlay
 		buildmods=CreateMenu("{{menu_program_buildmods}}",MENUBUILDMODULES,program,KEY_D,MENUMOD)
 		buildallmods=CreateMenu("{{menu_program_rebuildallmods}}",MENUBUILDALLMODULES,program)
 		docmods=CreateMenu("{{menu_program_rebuilddocs}}",MENUDOCMODS,program)
-		' Comandi compatti sulla stessa riga del menu
-		CreateMenu "[💾 SAVE]",MENUMINI_SAVE,menu
-		CreateMenu "[🚀 RUN]",MENUMINI_RUN,menu
+		' Comandi di visualizzazione dopo i menu standard
 		CreateMenu "[↪ PANEL]",MENUMINI_PANEL,menu
 		CreateMenu "[# LINE]",MENUMINI_LINES,menu
 
@@ -7120,8 +6985,7 @@ Type TCodePlay
 	End Method
 
 	Method RefreshAll()
-' hide/show toolbar
-		If options.showtoolbar Then ShowGadget toolbar Else HideGadget toolbar
+' legacy toolbar removed in NGide 1.05
 ' refresh panels
 		For Local panel:TToolPanel = EachIn panels
 			panel.invoke TOOLREFRESH
@@ -7144,7 +7008,7 @@ Type TCodePlay
 				winsize.h=GadgetHeight(window)
 			EndIf
 		EndIf
-		options.showtoolbar = Not GadgetHidden(toolbar)
+		options.showtoolbar = False
 	End Method
 
 	Method ToggleLineNumbers()
@@ -7865,59 +7729,6 @@ Type TCodePlay
 		Select event
 			Case EVENT_GADGETACTION
 				Select EventSource()
-					Case toolbar
-						Select EventData()
-							Case TB_NEW
-								OpenSource ""
-							Case TB_OPEN
-								OpenSource "."
-							Case TB_CLOSE
-								currentpanel.invoke TOOLCLOSE
-							Case TB_SAVE
-								currentpanel.invoke TOOLSAVE
-							Case TB_CUT
-								currentpanel.invoke TOOLCUT
-							Case TB_COPY
-								currentpanel.invoke TOOLCOPY
-							Case TB_PASTE
-								currentpanel.invoke TOOLPASTE
-							Case TB_FIND
-								currentpanel.invoke TOOLFIND
-							Case TB_BUILD
-								BuildCode
-							Case TB_BUILDRUN
-								RunCode
-							Case TB_STEP
-								If output output.stepover
-							Case TB_STEPIN
-								If output output.stepin
-							Case TB_STEPOUT
-								If output output.stepout
-							Case TB_STOP
-								If output output.Stop
-							Case TB_HOME
-								helppanel.Home
-								SelectPanel helppanel
-							Case TB_BACK
-								helppanel.Back
-								SelectPanel helppanel
-							Case TB_FORWARDS
-								helppanel.Forward
-								SelectPanel helppanel
-							Case TB_LOCKOPEN
-								'unlock
-								If lockedPanel 
-									TOpenCode(lockedPanel).SetLocked(False)
-								'lock if lockable
-								ElseIf TOpenCode(activePanel) 
-									TOpenCode(activePanel).SetLocked(True)
-								EndIf
-							Case TB_LOCKGOTO
-								If lockedPanel
-									SelectPanel(lockedPanel)
-								EndIf
-						End Select
-
 					Case tabbar
 						Local index = EventData()
 						If index>=0 And index<panels.length
