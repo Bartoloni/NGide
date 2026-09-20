@@ -1,0 +1,28 @@
+101 ICON "NGide.ico"
+
+1 VERSIONINFO 
+FILEVERSION 1,0,0,0 
+PRODUCTVERSION 1,0,0,0
+FILEOS 0x40004
+FILETYPE 0x1
+{ 
+BLOCK "StringFileInfo" 
+{ 
+ BLOCK "040904E4" 
+ { 
+  VALUE "Comments", "Updated by Davy Bartoloni on 2026"
+  VALUE "CompanyName", "Centro Analisi Informatiche" 
+  VALUE "FileVersion", "1.3x" 
+  VALUE "FileDescription", "NGide" 
+  VALUE "InternalName", "NGide" 
+  VALUE "LegalCopyright", "none"  
+  VALUE "OriginalFilename", "NGide.exe" 
+  VALUE "ProductName", "NGide" 
+  VALUE "ProductVersion", "1.3x" 
+ } 
+}
+BLOCK "VarFileInfo"
+{
+  VALUE "Translation", 0x409, 1252
+}
+}

@@ -57,7 +57,7 @@ Const DEFAULT_LANGUAGEPATH$ = "incbin::default.language.ini"
 Incbin "window_icon.png"
 
 Const IDE_NAME$="NGide"
-Const IDE_VERSION$="1.57 [2027]"
+Const IDE_VERSION$="1.1 [2027]"
 Const TIMER_FREQUENCY=15
 
 AppTitle = IDE_NAME + " " + IDE_VERSION
@@ -203,6 +203,7 @@ Const MENUAPPSTUB=160
 Const MENUMINI_SAVE=180
 Const MENUMINI_RUN=181
 Const MENUMINI_PANEL=182
+Const MENUMINI_LINES=183
 Const MENURECENT=256
 
 Const TB_NEW=0
@@ -4586,7 +4587,7 @@ Type TOpenCode Extends TToolPanel
 		TextAreaSetLineNumberBackColor textarea,rgb.red,rgb.green,rgb.blue
 		rgb=host.options.lineNumberStyle.fg
 		TextAreaSetLineNumberForeColor textarea,rgb.red,rgb.green,rgb.blue
-		TextAreaSetLineNumberEnable textarea, host.options.lineNumberStyle.flags
+		TextAreaSetLineNumberEnable textarea, host.lineNumbersVisible
 		TextAreaSetCaretLineBackgroundColor(textarea, host.options.caretStyle.caretLineColor.red, host.options.caretStyle.caretLineColor.green, host.options.caretStyle.caretLineColor.blue,host.options.caretStyle.caretLineAlpha)
 		TextAreaSetCaretLineVisible(textarea, host.options.caretStyle.caretLineVisible)
 		TextAreaSetBracketMatchingColor(textarea, host.options.styles[MATCHING].color.red, host.options.styles[MATCHING].color.green, host.options.styles[MATCHING].color.blue, host.options.styles[MATCHING].flags)
@@ -5793,6 +5794,7 @@ Type TCodePlay
 	Field winmax,tooly,splitpos,debugview,navtab
 	Field rightPanelVisible:Int=False
 	Field rightPanelSavedPos:Int=200
+	Field lineNumbersVisible:Int=False
 	Field progress,splitorientation
 	Field selectedappstub:String
 
@@ -6533,7 +6535,7 @@ Type TCodePlay
 
 	Method SetTitle(title$="")
 		If title title=" - "+title
-		SetGadgetText window,"NGide Build 20"+title
+		SetGadgetText window,"NGide "+IDE_VERSION+" "+title
 	End Method
 
 
@@ -6646,7 +6648,7 @@ Type TCodePlay
 
 		CheckVersion()
 
-		splash=CreateWindow("NGide Build 20",ScaledSize(200),ScaledSize(200),ScaledSize(400),ScaledSize(160),Null,WINDOW_CLIENTCOORDS|WINDOW_HIDDEN|WINDOW_CENTER)
+		splash=CreateWindow("NGide "+IDE_VERSION,ScaledSize(200),ScaledSize(200),ScaledSize(400),ScaledSize(160),Null,WINDOW_CLIENTCOORDS|WINDOW_HIDDEN|WINDOW_CENTER)
 			Local panel:TGadget = CreatePanel(0,0,ClientWidth(splash),ClientHeight(splash),splash,0)
 			SetPanelColor panel,255,255,255;SetPanelPixmap panel, LoadPixmapPNG("incbin::splash.png"), PANELPIXMAP_FIT2
 			Local progress:TGadget = CreateProgBar(ScaledSize(2),ClientHeight(panel)-ScaledSize(22),ClientWidth(panel)-ScaledSize(4),ScaledSize(20),panel)
@@ -6806,8 +6808,17 @@ Type TCodePlay
 'open files from .ini restorelist
 		If options.restoreopenfiles
 			Local activePanel:TToolPanel
-			If Not openlist.IsEmpty() Then tmpProgStep = (0.3/openlist.Count())
+			' NGide: all'avvio ripristina al massimo gli ultimi 5 sorgenti.
+			Local restoreStart:Int = Max(0, openlist.Count()-5)
+			Local restoreIndex:Int = 0
+			Local restoreCount:Int = Min(5, openlist.Count())
+			If restoreCount > 0 Then tmpProgStep = (0.3/restoreCount)
 			For Local openListLine:String = EachIn openlist
+				If restoreIndex < restoreStart Then
+					restoreIndex :+ 1
+					Continue
+				EndIf
+				restoreIndex :+ 1
 				Local parts:String[] = openListLine.split("|")
 				Local fileURI:String = parts[0]
 				Local fileActive:Int = 0
@@ -6855,6 +6866,7 @@ Type TCodePlay
 		' Il pannello destro parte nascosto per default.
 		If splitpos > ScaledSize(40) Then rightPanelSavedPos = splitpos
 		SetSplitterPosition split,0,False
+		HideGadget SplitterPanel(split,SPLITPANEL_SIDEPANE)
 		rightPanelVisible = False
 
 		If winmax MaximizeWindow(window)
@@ -7025,6 +7037,7 @@ Type TCodePlay
 		CreateMenu "[💾 SAVE]",MENUMINI_SAVE,menu
 		CreateMenu "[🚀 RUN]",MENUMINI_RUN,menu
 		CreateMenu "[↪ PANEL]",MENUMINI_PANEL,menu
+		CreateMenu "[# LINE]",MENUMINI_LINES,menu
 
 		If quickenabled CheckMenu quickenable
 		If debugenabled CheckMenu debugenable
@@ -7160,14 +7173,28 @@ Type TCodePlay
 		options.showtoolbar = Not GadgetHidden(toolbar)
 	End Method
 
+	Method ToggleLineNumbers()
+		lineNumbersVisible = Not lineNumbersVisible
+		For Local p:TToolPanel = EachIn panels
+			Local code:TOpenCode = TOpenCode(p)
+			If code And code.textarea Then
+				TextAreaSetLineNumberEnable code.textarea,lineNumbersVisible
+			EndIf
+		Next
+	End Method
+
 	Method ToggleRightPanel()
 		If rightPanelVisible Then
 			Local p:Int = SplitterPosition(split)
 			If p > ScaledSize(40) Then rightPanelSavedPos = p
+			' Prima azzera lo splitter, poi elimina realmente il gadget laterale.
 			SetSplitterPosition split,0,False
+			HideGadget SplitterPanel(split,SPLITPANEL_SIDEPANE)
 			rightPanelVisible = False
 		Else
 			If rightPanelSavedPos < ScaledSize(80) Then rightPanelSavedPos = ScaledSize(200)
+			' Ricrea visivamente il pannello solo quando viene richiesto.
+			ShowGadget SplitterPanel(split,SPLITPANEL_SIDEPANE)
 			SetSplitterPosition split,rightPanelSavedPos,False
 			rightPanelVisible = True
 		EndIf
@@ -7189,6 +7216,8 @@ Type TCodePlay
 				RunCode
 			Case MENUMINI_PANEL
 				ToggleRightPanel
+			Case MENUMINI_LINES
+				ToggleLineNumbers
 			Case MENUNEW
 				OpenSource ""
 			Case MENUOPEN
