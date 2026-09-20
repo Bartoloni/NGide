@@ -57,7 +57,7 @@ Const DEFAULT_LANGUAGEPATH$ = "incbin::default.language.ini"
 Incbin "window_icon.png"
 
 Const IDE_NAME$="NGide"
-Const IDE_VERSION$="1.1 [2027]"
+Const IDE_VERSION$="1.05 [2027]"
 Const TIMER_FREQUENCY=15
 
 AppTitle = IDE_NAME + " " + IDE_VERSION
@@ -123,7 +123,6 @@ Const MENUDEBUGENABLED=34
 'Const MENUGUIENABLED=35
 
 Const MENUCOMMANDLINE=36
-Const MENUIMPORTBB=38
 Const MENUFINDINFILES=39
 Const MENUPROJECTMANAGER=40
 Const MENUSHOWCONSOLE=41
@@ -148,9 +147,6 @@ Const MENUBROWSE=55
 Const MENUSHELL=56
 Const MENUPROPS=57
 
-Const MENUUPDATE=58
-Const MENUCOMMIT=59
-
 Const MENUCLOSEOTHERS=60
 
 Const MENUTHREADEDENABLED=61
@@ -165,21 +161,15 @@ Const MENUOVERRIDEERRORSENABLED=68
 Const MENUGPROFENABLED=69
 
 Const MENUHIRESENABLED=170
-
-Const MENUAPPOPTIONS=70
 Const MENUCONSOLEENABLED=71
 Const MENUGUIENABLED=72
 Const MENUMAKELIBENABLED=73
-
-Const MENUPLATFORM=80
 Const MENUWIN32ENABLED=81
 Const MENURASPBERRYPIENABLED=84
 Const MENUANDROIDENABLED=85
 Const MENUEMSCRIPTENENABLED=86
 Const MENUIOSENABLED=87
 Const MENUNXENABLED=88
-
-Const MENUARCHITECTURE=90
 Const MENUX86ENABLED=91
 Const MENUX64ENABLED=92
 Const MENUPPCENABLED=93
@@ -192,12 +182,8 @@ Const MENUARMV7ENABLED=99
 Const MENUARM64ENABLED=100
 
 Const MENUGOTOBUILD=110
-
-Const MENUMISC=140
 Const MENUUPXENABLED=141
 Const MENULAST=142
-
-Const MENUAPPSTUB=160
 
 
 Const MENUMINI_SAVE=180
@@ -2172,6 +2158,7 @@ Type THelpPanel Extends TToolPanel
 
 	Field host:TCodePlay
 	Field htmlview:TGadget
+	Field helpLabel:TGadget
 	Field docsReady:Int = False
 
 	Method EnsureDocs()
@@ -2365,11 +2352,16 @@ Type THelpPanel Extends TToolPanel
 		p.name="{{tab_help}}"
 		codeplay.addpanel(p)
 		style=HTMLVIEW_NONAVIGATE		'HTMLVIEW_NOCONTEXTMENU
+		' NGide 1.05: il vecchio Help HTML locale non viene piu' mostrato nel TAB Help.
+		' Manteniamo l'HTMLView nascosto per non interferire con eventuali richiami interni residui.
 		p.htmlview=CreateHTMLView(0,0,ClientWidth(p.panel),ClientHeight(p.panel),p.panel,style)
 		SetGadgetLayout p.htmlview,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED
-'		p.Home
-		' OTTIMIZZAZIONE: non scandire docs/moduli all'avvio.
-		' SyncDocs verra' eseguito al primo Home/Go interno.
+		HideGadget p.htmlview
+
+		p.helpLabel=CreateLabel("Please refer to the online documentation (if still available).",16,16,ClientWidth(p.panel)-32,28,p.panel,LABEL_LEFT)
+		SetGadgetLayout p.helpLabel,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_CENTERED
+
+		' Nessuna scansione/caricamento della vecchia documentazione all'apertura del TAB Help.
 		Return p
 	End Function
 
@@ -2830,7 +2822,6 @@ Type TFolderNode Extends TNode
 
 	Const PROJECTFOLDER=0
 	Const DIRECTORYFOLDER=1
-	Const FILEFOLDER=2
 
 	Method FindFolderFromPath:TFolderNode(dir$)
 		Local result:TFolderNode
@@ -2867,14 +2858,6 @@ Type TFolderNode Extends TNode
 		Local n:TNode = Self
 		While n
 			If TProjects(n) Return TProjects(n).host
-			n=n.parent
-		Wend
-	End Method
-
-	Method ProjectNode:TProjectFolderNode()
-		Local n:TNode = Self
-		While n
-			If TProjectFolderNode(n) Return TProjectFolderNode(n)
 			n=n.parent
 		Wend
 	End Method
@@ -3836,11 +3819,6 @@ Type TOutputPanel Extends TToolPanel	'used build and run
 	Method Clear()
 		If Not output Open()
 		SetGadgetText output,""
-	End Method
-
-	Method WriteAscii(mess$)
-		If Not output Open()
-		AddTextAreaText output,mess.Replace("~0","")
 	End Method
 
 	Method Write(mess$)
@@ -6368,17 +6346,6 @@ Type TCodePlay
 		Execute cmd,LocalizeString("{{output_msg_buildingmods}}")
 	End Method
 
-	Method ImportBB()
-		Local f$ = RequestFile(LocalizeString("{{request_importbb_title}}"),"bb" )
-		If Not f$ Return
-		Local cmd$ = Quote(bmkpath$)
-		cmd$:+" convertbb "
-		cmd$:+quote(FullPath(f$))
-		Execute cmd,LocalizeString("{{output_msg_converting}}").Replace("%1",StripExt(StripDir(f$)))
-		output.wait
-		OpenSource(StripExt(f$)+".bmx")
-	End Method
-
 	Method GetCommandLine$()
 		Return cmdline
 	End Method
@@ -6651,7 +6618,14 @@ Type TCodePlay
 		splash=CreateWindow("NGide "+IDE_VERSION,ScaledSize(200),ScaledSize(200),ScaledSize(400),ScaledSize(160),Null,WINDOW_CLIENTCOORDS|WINDOW_HIDDEN|WINDOW_CENTER)
 			Local panel:TGadget = CreatePanel(0,0,ClientWidth(splash),ClientHeight(splash),splash,0)
 			SetPanelColor panel,255,255,255;SetPanelPixmap panel, LoadPixmapPNG("incbin::splash.png"), PANELPIXMAP_FIT2
-			Local progress:TGadget = CreateProgBar(ScaledSize(2),ClientHeight(panel)-ScaledSize(22),ClientWidth(panel)-ScaledSize(4),ScaledSize(20),panel)
+			' Barra di caricamento personalizzata NGide: sfondo scuro + riempimento azzurro.
+			' Non usa CreateProgBar, quindi il colore non viene imposto dal tema di Windows.
+			Local progressW:Int = ClientWidth(panel)-ScaledSize(4)
+			Local progressH:Int = ScaledSize(20)
+			Local progressBack:TGadget = CreatePanel(ScaledSize(2),ClientHeight(panel)-ScaledSize(22),progressW,progressH,panel,0)
+			SetPanelColor progressBack,38,48,58
+			Local progress:TGadget = CreatePanel(0,0,1,progressH,progressBack,0)
+			SetPanelColor progress,35,170,235
 			ShowGadget splash;PollSystem
 
 		window=CreateWindow("NGide",20,20,760,540,Null,WINDOW_TITLEBAR|WINDOW_RESIZABLE|WINDOW_STATUS|WINDOW_HIDDEN|WINDOW_ACCEPTFILES|WINDOW_MENU)
@@ -6670,7 +6644,7 @@ Type TCodePlay
 		searchreq=TSearchRequester.Create(Self)
 		aboutreq=TAboutRequester.Create(Self)
 
-		UpdateProgBar progress, 0.1;PollSystem
+		SetGadgetShape progress,0,0,Max(1,Int(progressW*(0.1))),progressH;PollSystem
 		ReadConfig()
 
 		' Toolbar interna nascosta: usa sempre la strip base.
@@ -6728,7 +6702,7 @@ Type TCodePlay
 			winsize.set(20,20,760,540)
 		EndIf
 
-		UpdateProgBar progress, 0.2;PollSystem
+		SetGadgetShape progress,0,0,Max(1,Int(progressW*(0.2))),progressH;PollSystem
 
 		SetGadgetShape(window, winsize.x, winsize.y, winsize.w, winsize.h)
 
@@ -6767,7 +6741,7 @@ Type TCodePlay
 
 		SetMode EDITMODE
 
-		UpdateProgBar progress, 0.3;PollSystem
+		SetGadgetShape progress,0,0,Max(1,Int(progressW*(0.3))),progressH;PollSystem
 
 		' OTTIMIZZAZIONE: QuickHelp viene caricato solo quando serve.
 		quickhelp = Null
@@ -6782,7 +6756,7 @@ Type TCodePlay
 
 		RefreshAll
 
-		UpdateProgBar progress, 0.4;PollSystem 'allow repaint
+		SetGadgetShape progress,0,0,Max(1,Int(progressW*(0.4))),progressH;PollSystem 'allow repaint
 
 		Local mkdocs
 		If FileType( bmxpath+"/docs/html/User Guide/index.html" )<>FILETYPE_FILE
@@ -6793,14 +6767,14 @@ Type TCodePlay
 
 		' Avvio con pannello Help vuoto: non caricare la home HTML.
 		' L'Help resta disponibile normalmente dai relativi comandi del menu.
-		UpdateProgBar progress, 0.5;PollSystem
+		SetGadgetShape progress,0,0,Max(1,Int(progressW*(0.5))),progressH;PollSystem
 
 ' scan projects in projlist
 		For Local pdata:TList = EachIn projlist
 			projects.AddProject pdata
 		Next
 
-		UpdateProgBar progress, 0.6;PollSystem
+		SetGadgetShape progress,0,0,Max(1,Int(progressW*(0.6))),progressH;PollSystem
 
 		Local tmpProgValue# = 0.6
 		Local tmpProgStep#
@@ -6839,7 +6813,7 @@ Type TCodePlay
 				EndIf
 
 				tmpProgValue :+ tmpProgStep
-				UpdateProgBar progress,tmpProgValue
+				SetGadgetShape progress,0,0,Max(1,Int(progressW*(tmpProgValue))),progressH
 			Next
 
 			If activePanel Then SelectPanel( activePanel )
@@ -6847,12 +6821,12 @@ Type TCodePlay
 
 		tmpProgValue = 0.9
 		If AppArgs.length > 1 Then tmpProgStep = (0.1/(AppArgs.length-1)) Else tmpProgValue = 1.0
-		UpdateProgBar progress,tmpProgValue;PollSystem
+		SetGadgetShape progress,0,0,Max(1,Int(progressW*(tmpProgValue))),progressH;PollSystem
 
 ' open files specified in command line
 		For Local i:Int = 1 Until AppArgs.length
 			open=OpenSource(AppArgs[i])
-			tmpProgValue:+tmpProgStep;UpdateProgBar progress,tmpProgValue;PollSystem
+			tmpProgValue:+tmpProgStep;SetGadgetShape progress,0,0,Max(1,Int(progressW*(tmpProgValue))),progressH;PollSystem
 		Next
 
 		If options.restartaftershutdown Then
@@ -7486,10 +7460,6 @@ Type TCodePlay
 					CheckMenu(upxEnable)
 				EndIf
 				UpdateWindowMenu window
-
-			Case MENUIMPORTBB
-				ImportBB
-
 			Case MENUFINDINFILES
 				If activepanel Then searchreq.ShowWithPath( ExtractDir(activepanel.path) ) Else searchreq.Show()
 
