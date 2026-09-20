@@ -37,7 +37,7 @@ Import MaxGUI.ProxyGadgets
 Import brl.eventqueue
 Import brl.filesystem
 Import brl.system
-Import brl.ramstream
+'Import brl.ramstream
 Import pub.freeprocess
 Import brl.pngloader
 Import brl.timer
@@ -55,7 +55,7 @@ Const DEFAULT_LANGUAGEPATH$ = "incbin::default.language.ini"
 Incbin "window_icon.png"
 
 Const IDE_NAME$="NGide"
-Const IDE_VERSION$="1.05 [2027]"
+Const IDE_VERSION$="1.11 [2027]"
 Const TIMER_FREQUENCY=15
 
 AppTitle = IDE_NAME + " " + IDE_VERSION
@@ -130,7 +130,6 @@ Const MENUHOME=43
 Const MENUBACK=44
 Const MENUFORWARD=45
 Const MENUQUICKHELP=46
-Const MENUABOUT=47
 
 Const MENUNEWVIEW=48
 Const MENUDOCMODS=49
@@ -512,228 +511,6 @@ Type TPanelRequester Extends TRequester
 	End Method
 
 End Type
-
-Type TAboutRequester Extends TRequester
-
-	Field lblTitle:TGadget, lblSubtitle:TGadget
-	Field lblLeftAligned:TGadget[], lblRightAligned:TGadget[]
-	Field hypBlitz:TGadget
-
-	Method PopulateText()
-
-		Local strHeadings$[], strValues$[]
-
-		strHeadings:+["{{about_label_bccver}}:"]
-		strValues:+[BCC_VERSION]
-
-		strHeadings:+["{{about_label_bmkver}}:"]
-		strValues:+[GetBMK()]
-
-		strHeadings:+[""]
-		strValues:+[""]
-
-		strHeadings:+["{{about_label_bmxpath}}:"]
-		strValues:+[BlitzMaxPath().Replace("/","\")]
-
-		strHeadings:+["{{about_label_mingwpath}}:"]
-		' check For Local mingw32 dir First
-		Local path:String = MinGWPath()
-		If path Then
-			strValues:+[path.Replace("/", "\")]
-		Else
-			strValues:+[LocalizeString("{{about_error_unavailable}}")]
-		EndIf
-
-		strHeadings:+[""]
-		strValues:+[""]
-		strHeadings:+["{{about_label_fasmver}}:"]
-		strValues:+[GetFASM()]
-
-		strHeadings:+["{{about_label_gccver}}:"]
-		strValues:+[GetGCC()]
-
-		strHeadings:+["{{about_label_gplusplusver}}:"]
-		strValues:+[GetGpp()]
-
-		strHeadings:+["{{about_label_upxver}}:"]
-		strValues:+[GetUPX()]
-
-		PopulateColumns( strHeadings, strValues )
-
-	EndMethod
-
-	Function GetProcessOutput$(cmd$, flags$ = "")
-
-		Local	version$
-
-			cmd:+".exe"
-
-		cmd=Quote(cmd)
-		If flags Then cmd:+" "+flags
-
-		Local	process:TProcess = CreateProcess(cmd,HIDECONSOLE)
-
-		If process
-			Local bytes:Byte[]
-			Local tmpTimeout:Int = MilliSecs() + 500
-			Repeat
-				Delay 10
-				bytes=process.pipe.ReadPipe()
-				If bytes
-					version:+String.FromBytes(bytes,bytes.length)
-				EndIf
-			Until (Not process.status()) Or (MilliSecs() > tmpTimeout)
-			process.Close()
-
-			Return version.Trim().Replace("~r","")
-		EndIf
-
-		Return LocalizeString("{{about_error_unavailable}}")
-
-	EndFunction
-
-	Method GetFASM$()
-			Local tmpSections$[] = GetProcessOutput(BlitzMaxPath()+"/bin/fasm").Split("~n")[0].Split(" ")
-			Return tmpSections[tmpSections.length-1]
-
-	EndMethod
-
-	Method GetBMK$()
-		Local tmpSections$[] = GetProcessOutput(BlitzMaxPath()+"/bin/bmk", "-v").Split("~n")
-		Return tmpSections[tmpSections.length-1]
-	EndMethod
-
-	Method GetGCC$()
-		Local gccPath:String = MinGWPath()
-		If Not gccPath Then Return LocalizeString("{{about_error_notapplicable}}")
-		gccPath :+ "/bin/gcc"
-		gccPath = gccPath.Replace("/", "\")
-		Return GetProcessOutput(gccPath, "-dumpversion").Split("~n")[0]
-	EndMethod
-
-	Method GetGpp$()
-		Local gppPath:String = MinGWPath()
-		If Not gppPath Then Return LocalizeString("{{about_error_notapplicable}}")
-		gppPath:+ "/bin/g++"
-		gppPath = gppPath.Replace("/", "\")
-		Return GetProcessOutput(gppPath, "-dumpversion").Split("~n")[0]
-	EndMethod
-
-	Method GetUPX$()
-		Local upxPath:String = BlitzMaxPath() + "/bin/upx"
-		Local ext:String
-		ext = ".exe"
-		upxPath = upxPath.Replace("/", "\")
-		If FileType(upxPath + ext) = FILETYPE_FILE
-			Return GetProcessOutput(upxPath, "-V").Split("~n")[0]
-		Else
-			Return LocalizeString("{{about_error_notapplicable}}")
-		EndIf
-	EndMethod
-
-	Method PopulateColumns( strHeadings$[], strValues$[] )
-
-		strHeadings = strHeadings[..lblLeftAligned.length]
-		strValues = strValues[..lblRightAligned.length]
-
-		For Local i:Int = 0 Until lblLeftAligned.length
-			LocalizeGadget( lblLeftAligned[i], strHeadings[i] )
-		Next
-
-		For Local i:Int = 0 Until lblRightAligned.length
-			SetGadgetText( lblRightAligned[i], strValues[i] )
-			SetGadgetToolTip( lblRightAligned[i], strValues[i] )
-		Next
-
-	EndMethod
-
-	Method Show()
-		PopulateText()
-		Super.Show()
-	EndMethod
-
-	Method Poll()
-		Select EventSource()
-			Case window
-				If EventID()=EVENT_WINDOWCLOSE
-					Hide()
-				EndIf
-			Case cancel
-				If EventID()=EVENT_GADGETACTION
-					Hide()
-				EndIf
-			Default
-				Return 0
-		End Select
-		Return 1
-	End Method
-
-	Function Create:TAboutRequester(host:TCodePlay)
-
-		Local abt:TAboutRequester = New TAboutRequester
-		abt.initrequester(host,"{{about_window_title}}",ScaledSize(460),ScaledSize(299),STYLE_CANCEL|STYLE_DIVIDER|STYLE_MODAL)
-
-		Local win:TGadget = abt.window, w = ClientWidth(abt.window)-ScaledSize(12), h = ClientHeight(abt.window)
-
-		' Usa la stessa risorsa dell'icona del programma anche nell'About.
-		' In questo modo bmxlogo.png non e' piu' necessario.
-		Local aboutIcon:TGadget = CreatePanel(ScaledSize(6),ScaledSize(8),ScaledSize(48),ScaledSize(48),win)
-		SetPanelPixmap aboutIcon, LoadPixmapPNG("incbin::window_icon.png"), PANELPIXMAP_FIT
-
-		Local y = 12
-		Local arch:String
-?x86
-		arch = "x86"
-?x64
-		arch = "x64"
-?arm
-		arch = "arm"
-?arm64
-		arch = "arm64"
-?
-		abt.lblTitle = CreateLabel(IDE_NAME + " " + IDE_VERSION + " (" + arch + ")",ScaledSize(62),ScaledSize(y),w-ScaledSize(56),ScaledSize(22),win,LABEL_LEFT)
-		SetGadgetFont abt.lblTitle, LookupGuiFont( GUIFONT_SYSTEM, 12, FONT_BOLD )
-		SetGadgetLayout abt.lblTitle, EDGE_ALIGNED, EDGE_ALIGNED, EDGE_ALIGNED, EDGE_CENTERED
-		y:+23
-		abt.lblSubtitle = CreateLabel("{{about_label_subtitle}}",ScaledSize(62),ScaledSize(y),w-ScaledSize(56),ScaledSize(22),win,LABEL_LEFT)
-		SetGadgetFont abt.lblSubtitle, LookupGuiFont( GUIFONT_SYSTEM, 10, FONT_ITALIC )
-		SetGadgetLayout abt.lblSubtitle, EDGE_ALIGNED, EDGE_ALIGNED, EDGE_ALIGNED, EDGE_CENTERED
-
-		y = 64
-
-		SetGadgetLayout( CreateLabel("",ScaledSize(6),ScaledSize(y),w,ScaledSize(4),win,LABEL_SEPARATOR), EDGE_ALIGNED, EDGE_ALIGNED, EDGE_ALIGNED, EDGE_CENTERED )
-
-		y:+(4+6)
-
-		Local tmpGadget:TGadget
-
-		For y = y Until (299-21) Step 22
-
-			tmpGadget = CreateLabel("",ScaledSize(6),ScaledSize(y),ScaledSize(135),ScaledSize(22),win,LABEL_LEFT)
-			SetGadgetLayout( tmpGadget, EDGE_ALIGNED, EDGE_RELATIVE, EDGE_ALIGNED, EDGE_CENTERED )
-			abt.lblLeftAligned:+[tmpGadget]
-
-			tmpGadget = CreateLabel("",ScaledSize(135+6),ScaledSize(y),w-ScaledSize(175),ScaledSize(22),win,LABEL_LEFT)
-			SetGadgetLayout( tmpGadget, EDGE_RELATIVE, EDGE_ALIGNED, EDGE_ALIGNED, EDGE_CENTERED )
-			DelocalizeGadget tmpGadget
-			abt.lblRightAligned:+[tmpGadget]
-
-		Next
-
-		abt.hypBlitz = CreateHyperlink("https://blitzmax.org",ScaledSize(6),(h-ScaledSize(28)),ScaledSize(200),ScaledSize(26),win,LABEL_LEFT)
-		SetGadgetLayout abt.hypBlitz, EDGE_ALIGNED, EDGE_ALIGNED, EDGE_CENTERED, EDGE_ALIGNED
-
-		Return abt
-
-	EndFunction
-
-	Function Spacer( height:Int, inpout:Int Var )
-		inpout:+height+ScaledSize(6)
-		Return height
-	EndFunction
-
-EndType
-
 
 Type TCmdLineRequester Extends TRequester
 	Field	label:TGadget,textfield:TGadget
@@ -1225,7 +1002,7 @@ Type TOptionsRequester Extends TPanelRequester
 	Field	optionspanel:TGadget,editorpanel:TGadget,toolpanel:TGadget,appstubpanel:TGadget
 ' settings
 	Field	showtoolbar,restoreopenfiles,autocapitalize,syntaxhighlight,autobackup,autoindent,hideoutput
-	Field	bracketmatching, externalhelp,systemkeys,sortcode,restartaftershutdown
+	Field	bracketmatching,systemkeys,sortcode,restartaftershutdown
 	Field	tabsize,language$
 	Field	editfontname$,editfontsize,editcolor:TColor
 	Field	outputfontname$,outputfontsize,outputcolor:TColor
@@ -1235,7 +1012,7 @@ Type TOptionsRequester Extends TPanelRequester
 	Field languages:TGadget
 	Field	tabbutton:TGadget
 	Field	editpanel:TGadget,editbutton:TGadget
-	Field	buttons:TGadget[12]
+	Field	buttons:TGadget[11]
 	Field	styles:TTextStyle[]
 	Field	textarea:TGadget
 	Field	outputstyle:TGadgetStyle
@@ -1326,7 +1103,6 @@ Type TOptionsRequester Extends TPanelRequester
 		stream.WriteLine "console_linenumber_style="+outputLineNumberStyle.ToString()
 		stream.WriteLine "navi_style="+navstyle.ToString()	'Renamed from 'nav_style' to bump users to default treeview font.
 		stream.WriteLine "hide_output="+hideoutput
-		stream.WriteLine "external_help="+externalhelp
 		stream.WriteLine "system_keys="+systemkeys
 		stream.WriteLine "sort_code="+sortcode
 		stream.WriteLine "restart_after_shutdown="+restartaftershutdown
@@ -1370,7 +1146,6 @@ Type TOptionsRequester Extends TPanelRequester
 				Case "console_linenumber_style" outputLineNumberStyle.FromString(b)
 				Case "navi_style" navstyle.FromString(b)	'Renamed from 'nav_style' to bump users to default treeview font.
 				Case "hide_output" hideoutput=t
-				Case "external_help" externalhelp=t
 				Case "system_keys" systemkeys=t
 				Case "sort_code" sortcode=t
 				Case "restart_after_shutdown" restartaftershutdown=t
@@ -1417,10 +1192,9 @@ Type TOptionsRequester Extends TPanelRequester
 		SetButtonState buttons[5],autobackup
 		SetButtonState buttons[6],autoindent
 		SetButtonState buttons[7],hideoutput
-		SetButtonState buttons[8],externalhelp
-		SetButtonState buttons[9],systemkeys
-		SetButtonState buttons[10],sortcode
-		SetButtonState buttons[11],restartaftershutdown
+		SetButtonState buttons[8],systemkeys
+		SetButtonState buttons[9],sortcode
+		SetButtonState buttons[10],restartaftershutdown
 		SelectGadgetItem tabbutton,Min(Max(tabsize/2-1,0),7)
 		SetPanelColor editpanel,editcolor.red,editcolor.green,editcolor.blue
 		SetGadgetText editbutton,editfontname+" : "+editfontsize + "pt"
@@ -1485,10 +1259,9 @@ Type TOptionsRequester Extends TPanelRequester
 					Case buttons[5];autobackup=ButtonState(buttons[5])
 					Case buttons[6];autoindent=ButtonState(buttons[6])
 					Case buttons[7];hideoutput=ButtonState(buttons[7])
-					Case buttons[8];externalhelp=ButtonState(buttons[8])
-					Case buttons[9];systemkeys=ButtonState(buttons[9]);dirty=2
-					Case buttons[10];sortcode=ButtonState(buttons[10]);dirty=3
-					Case buttons[11];restartaftershutdown=ButtonState(buttons[11]);dirty=4
+					Case buttons[8];systemkeys=ButtonState(buttons[9]);dirty=2
+					Case buttons[9];sortcode=ButtonState(buttons[10]);dirty=3
+					Case buttons[10];restartaftershutdown=ButtonState(buttons[11]);dirty=4
 					Case tabber;SetPanelIndex SelectedGadgetItem(tabber)
 					Case ok
 						Hide()
@@ -1616,10 +1389,9 @@ Type TOptionsRequester Extends TPanelRequester
 		buttons[5]=CreateButton("{{options_options_btn_autobackup}}",ScaledSize(6),ScaledSize(138),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 		buttons[6]=CreateButton("{{options_options_btn_autoindent}}",ScaledSize(6),ScaledSize(164),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 		buttons[7]=CreateButton("{{options_options_btn_autohideoutput}}",ScaledSize(6),ScaledSize(190),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
-		buttons[8]=CreateButton("{{options_options_btn_useexternalbrowser}}",ScaledSize(6),ScaledSize(216),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
-		buttons[9]=CreateButton("{{options_options_btn_osshortcuts}}",ScaledSize(6),ScaledSize(242),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
-		buttons[10]=CreateButton("{{options_options_btn_sortcodeviewnodes}}",ScaledSize(6),ScaledSize(268),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
-		buttons[11]=CreateButton("{{options_options_btn_restartaftershutdown}}",ScaledSize(6),ScaledSize(294),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
+		buttons[8]=CreateButton("{{options_options_btn_osshortcuts}}",ScaledSize(6),ScaledSize(216),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
+		buttons[9]=CreateButton("{{options_options_btn_sortcodeviewnodes}}",ScaledSize(6),ScaledSize(242),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
+		buttons[10]=CreateButton("{{options_options_btn_restartaftershutdown}}",ScaledSize(6),ScaledSize(268),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 
 		w=editorpanel
 		CreateLabel("{{options_editor_label_background}}:",ScaledSize(6),ScaledSize(6+4),ScaledSize(90),ScaledSize(24),w)
@@ -2249,8 +2021,8 @@ Type THelpPanel Extends TToolPanel
 			Select EventID()
 				Case EVENT_GADGETACTION				'NAVIGATEREQUEST
 					url$=String( EventExtra() )
-					If url[..5]="http:"
-						OpenURL url
+					If url[..5]="http:" Or url[..6]="https:"
+						Return
 					Else
 						p=url.findlast(".")
 						If p>-1
@@ -2280,14 +2052,6 @@ Type THelpPanel Extends TToolPanel
 		Local	node:TNode
 
 		If isInternal Then EnsureDocs()
-
-		If host.options.externalhelp And Not isInternal
-			PollSystem
-			OpenURL url
-			MinimizeWindow host.window
-			PollSystem
-			Return
-		EndIf
 
 		HtmlViewGo htmlview,url
 		host.SelectPanel Self
@@ -5688,7 +5452,6 @@ Type TCodePlay
 	Field projectreq:TProjectRequester
 	Field projectprops:TProjectProperties
 	Field searchreq:TSearchRequester
-	Field aboutreq:TAboutRequester
 
 
 	Field eventhandlers:TList=New TList
@@ -6553,7 +6316,6 @@ Type TCodePlay
 		projectreq=TProjectRequester.Create(Self)
 		projectprops=TProjectProperties.Create(Self)
 		searchreq=TSearchRequester.Create(Self)
-		aboutreq=TAboutRequester.Create(Self)
 
 		SetGadgetShape progress,0,0,Max(1,Int(progressW*(0.1))),progressH;PollSystem
 		ReadConfig()
@@ -7362,9 +7124,6 @@ Type TCodePlay
 			Case MENUFORWARD
 				helppanel.Forward()
 				SelectPanel helppanel
-			Case MENUABOUT
-				aboutreq.Show()
-				'Notify (ABOUT.Replace( "{bcc_version}",BCC_VERSION ))
 			Case MENUINDENT
 				currentpanel.invoke TOOLINDENT
 			Case MENUOUTDENT
