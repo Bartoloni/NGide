@@ -55,7 +55,7 @@ Const DEFAULT_LANGUAGEPATH$ = "incbin::default.language.ini"
 Incbin "window_icon.png"
 
 Const IDE_NAME$="NGide"
-Const IDE_VERSION$="1.11 [2027]"
+Const IDE_VERSION$="1.15 [2027]"
 Const TIMER_FREQUENCY=15
 
 AppTitle = IDE_NAME + " " + IDE_VERSION
@@ -700,7 +700,7 @@ Type TTextStyle
 		s.panel=CreatePanel(xpos+ScaledSize(114),ypos,ScaledSize(24),ScaledSize(24),window,PANEL_BORDER|PANEL_ACTIVE)
 		SetPanelColor s.panel,255,255,0
 		s.combo=CreateComboBox(xpos+ScaledSize(142),ypos,ScaledSize(96),ScaledSize(24),window)
-		s.underline=CreateButton("{{txtstyle_underline}}",xpos+ScaledSize(270),ypos,ClientWidth(window)-(xpos+ScaledSize(220)),ScaledSize(24),window,BUTTON_CHECKBOX)
+		s.underline=CreateButton("{{txtstyle_underline}}",xpos+ScaledSize(270),ypos,ClientWidth(window)-(xpos+ScaledSize(278)),ScaledSize(24),window,BUTTON_CHECKBOX)
 		AddGadgetItem s.combo,"{{txtstyle_normal}}",GADGETITEM_LOCALIZED
 		AddGadgetItem s.combo,"{{txtstyle_bold}}",GADGETITEM_LOCALIZED
 		AddGadgetItem s.combo,"{{txtstyle_italic}}",GADGETITEM_LOCALIZED
@@ -792,7 +792,7 @@ Type TCaretStyle
 		s.caretLinePanel = CreatePanel(xpos+ScaledSize(242),ypos,ScaledSize(24),ScaledSize(24),window,PANEL_BORDER|PANEL_ACTIVE)
 		SetPanelColor(s.caretLinePanel, 255, 255, 0)
 
-		s.caretLineVisibleToggle = CreateButton("{{caretline_visible}}",xpos+ScaledSize(270),ypos,ClientWidth(window)-(xpos+ScaledSize(220)),ScaledSize(24),window,BUTTON_CHECKBOX)
+		s.caretLineVisibleToggle = CreateButton("{{caretline_visible}}",xpos+ScaledSize(270),ypos,ClientWidth(window)-(xpos+ScaledSize(278)),ScaledSize(24),window,BUTTON_CHECKBOX)
 		Return s
 	End Function
 End Type
@@ -864,7 +864,7 @@ Type TLineNumberStyle
 		SetPanelColor s.fgPanel,255,255,0
 		s.bgPanel=CreatePanel(xpos+ScaledSize(142),ypos,ScaledSize(24),ScaledSize(24),window,PANEL_BORDER|PANEL_ACTIVE)
 		SetPanelColor s.bgPanel,255,255,0
-		s.enabled=CreateButton("{{linenumberstyle_enabled}}",xpos+ScaledSize(270),ypos,ClientWidth(window)-(xpos+ScaledSize(220)),ScaledSize(24),window,BUTTON_CHECKBOX)
+		s.enabled=CreateButton("{{linenumberstyle_enabled}}",xpos+ScaledSize(270),ypos,ClientWidth(window)-(xpos+ScaledSize(278)),ScaledSize(24),window,BUTTON_CHECKBOX)
 
 		Return s
 	End Function
@@ -994,7 +994,7 @@ Const COMMENT=1
 Const QUOTED=2
 Const KEYWORD=3
 Const NUMBER=4
-Const MATCHING=5
+Const OPERATOR_STYLE=5
 Const ERROR=6
 
 Type TOptionsRequester Extends TPanelRequester
@@ -1002,7 +1002,7 @@ Type TOptionsRequester Extends TPanelRequester
 	Field	optionspanel:TGadget,editorpanel:TGadget,toolpanel:TGadget,appstubpanel:TGadget
 ' settings
 	Field	showtoolbar,restoreopenfiles,autocapitalize,syntaxhighlight,autobackup,autoindent,hideoutput
-	Field	bracketmatching,systemkeys,sortcode,restartaftershutdown
+	Field	systemkeys,sortcode,restartaftershutdown
 	Field	tabsize,language$
 	Field	editfontname$,editfontsize,editcolor:TColor
 	Field	outputfontname$,outputfontsize,outputcolor:TColor
@@ -1049,7 +1049,6 @@ Type TOptionsRequester Extends TPanelRequester
 
 	Method SetDefaults()
 		language=DEFAULT_LANGUAGEPATH
-		bracketmatching=True
 		showtoolbar=False
 		restoreopenfiles=True
 		autocapitalize=True
@@ -1065,7 +1064,8 @@ Type TOptionsRequester Extends TPanelRequester
 		styles[QUOTED].set( $00ff66,0 )
 		styles[KEYWORD].set( $ffff00,0 )
 		styles[NUMBER].set( $40ffff,0 )
-		styles[MATCHING].set( $ff4040,TEXTFORMAT_BOLD )
+		' Operators and brackets use their own normal lexer style.
+		styles[OPERATOR_STYLE].set( $ff80ff,0 )
 		styles[ERROR].set( $ff2020,TEXTFORMAT_BOLD )
 		outputstyle.set(0,-1,GUIFONT_MONOSPACED)
 		outputLineNumberStyle.set(0,$ededed, False)
@@ -1085,7 +1085,6 @@ Type TOptionsRequester Extends TPanelRequester
 		stream.WriteLine "restoreopenfiles="+restoreopenfiles
 		stream.WriteLine "autocapitalize="+autocapitalize
 		stream.WriteLine "syntaxhighlight="+syntaxhighlight
-		stream.WriteLine "bracketmatching="+bracketmatching
 		stream.WriteLine "autobackup="+autobackup
 		stream.WriteLine "autoindent="+autoindent
 		stream.WriteLine "tabsize="+tabsize
@@ -1097,7 +1096,7 @@ Type TOptionsRequester Extends TPanelRequester
 		stream.WriteLine "quote_style="+styles[QUOTED].ToString()
 		stream.WriteLine "keyword_style="+styles[KEYWORD].ToString()
 		stream.WriteLine "number_style="+styles[NUMBER].ToString()
-		stream.WriteLine "matched_style="+styles[MATCHING].ToString()
+		stream.WriteLine "operator_style="+styles[OPERATOR_STYLE].ToString()
 		stream.WriteLine "error_style="+styles[ERROR].ToString()
 		stream.WriteLine "console_style="+outputstyle.ToString()	'Renamed from 'output_style' to bump users to default monospace font.
 		stream.WriteLine "console_linenumber_style="+outputLineNumberStyle.ToString()
@@ -1128,7 +1127,6 @@ Type TOptionsRequester Extends TPanelRequester
 				Case "restoreopenfiles" restoreopenfiles=t
 				Case "autocapitalize" autocapitalize=t
 				Case "syntaxhighlight" syntaxhighlight=t
-				Case "bracketmatching" bracketmatching=t
 				Case "autobackup" autobackup=t
 				Case "autoindent" autoindent=t
 				Case "tabsize" tabsize=t
@@ -1140,7 +1138,7 @@ Type TOptionsRequester Extends TPanelRequester
 				Case "quote_style" styles[QUOTED].FromString(b)
 				Case "keyword_style" styles[KEYWORD].FromString(b)
 				Case "number_style" styles[NUMBER].FromString(b)
-				Case "matched_style" styles[MATCHING].FromString(b)
+				Case "operator_style" styles[OPERATOR_STYLE].FromString(b)
 				Case "error_style" styles[ERROR].FromString(b)
 				Case "console_style" outputstyle.FromString(b)	'Renamed from 'output_style' to bump users to default monospace font.
 				Case "console_linenumber_style" outputLineNumberStyle.FromString(b)
@@ -1166,6 +1164,21 @@ Type TOptionsRequester Extends TPanelRequester
 				appstubs :+ [b]
 			End If
 		Wend
+
+		' NGide 1.15: migrate the temporary Operators colour used by NGide_15.
+		' The old salmon colour was too easy to confuse with Remarks.
+		' Operators now start magenta, but remain independently configurable.
+		If styles[OPERATOR_STYLE].color.red=255 And styles[OPERATOR_STYLE].color.green=128 And styles[OPERATOR_STYLE].color.blue=128 Then
+			styles[OPERATOR_STYLE].set($ff80ff,0)
+		EndIf
+		' Also separate old configurations where Operators and Remarks accidentally
+		' ended up with exactly the same colour.
+		If styles[OPERATOR_STYLE].color.red=styles[COMMENT].color.red And ..
+		   styles[OPERATOR_STYLE].color.green=styles[COMMENT].color.green And ..
+		   styles[OPERATOR_STYLE].color.blue=styles[COMMENT].color.blue Then
+			styles[OPERATOR_STYLE].set($ff80ff,0)
+		EndIf
+
 		RefreshGadgets
 	End Method
 
@@ -1188,7 +1201,6 @@ Type TOptionsRequester Extends TPanelRequester
 		SetButtonState buttons[1],restoreopenfiles
 		SetButtonState buttons[2],autocapitalize
 		SetButtonState buttons[3],syntaxhighlight
-		SetButtonState buttons[4],bracketmatching
 		SetButtonState buttons[5],autobackup
 		SetButtonState buttons[6],autoindent
 		SetButtonState buttons[7],hideoutput
@@ -1207,10 +1219,10 @@ Type TOptionsRequester Extends TPanelRequester
 		SetGadgetFont textarea,editfont
 		styles[NORMAL].format(textarea,0,TEXTAREA_ALL)
 		styles[COMMENT].format(textarea,0,12)
-		styles[MATCHING].format(textarea,24,1)
+		styles[OPERATOR_STYLE].format(textarea,24,1)
 		styles[NUMBER].format(textarea,25,3)
 		styles[NUMBER].format(textarea,31,1)
-		styles[MATCHING].format(textarea,32,1)
+		styles[OPERATOR_STYLE].format(textarea,32,1)
 		styles[NUMBER].format(textarea,36,1)
 		styles[KEYWORD].format(textarea,39,5)
 		styles[QUOTED].format(textarea,46,10)
@@ -1223,7 +1235,6 @@ Type TOptionsRequester Extends TPanelRequester
 		TextAreaSetCaretLineBackgroundColor(textarea, caretStyle.caretLineColor.red, caretStyle.caretLineColor.green, caretStyle.caretLineColor.blue, caretStyle.caretLineAlpha)
 		TextAreaSetCaretLineVisible(textarea, caretStyle.caretLineVisible)
 		
-		TextAreaSetBracketMatchingColor textarea, styles[MATCHING].color.red, styles[MATCHING].color.green, styles[MATCHING].color.blue, styles[MATCHING].flags
 		UnlockTextArea textarea
 		outputstyle.Refresh
 		outputLineNumberStyle.Refresh
@@ -1255,7 +1266,6 @@ Type TOptionsRequester Extends TPanelRequester
 					Case buttons[1];restoreopenfiles=ButtonState(buttons[1])
 					Case buttons[2];autocapitalize=ButtonState(buttons[2]);dirty=True
 					Case buttons[3];syntaxhighlight=ButtonState(buttons[3]);dirty=True
-					Case buttons[4];bracketmatching=ButtonState(buttons[4])
 					Case buttons[5];autobackup=ButtonState(buttons[5])
 					Case buttons[6];autoindent=ButtonState(buttons[6])
 					Case buttons[7];hideoutput=ButtonState(buttons[7])
@@ -1386,6 +1396,7 @@ Type TOptionsRequester Extends TPanelRequester
 		buttons[2]=CreateButton("{{options_options_btn_autocaps}}",ScaledSize(6),ScaledSize(60),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 		buttons[3]=CreateButton("{{options_options_btn_syntaxhighlight}}",ScaledSize(6),ScaledSize(86),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 		buttons[4]=CreateButton("{{options_options_btn_bracketmatching}}",ScaledSize(6),ScaledSize(112),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
+		HideGadget buttons[4] ' bracket matching removed
 		buttons[5]=CreateButton("{{options_options_btn_autobackup}}",ScaledSize(6),ScaledSize(138),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 		buttons[6]=CreateButton("{{options_options_btn_autoindent}}",ScaledSize(6),ScaledSize(164),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 		buttons[7]=CreateButton("{{options_options_btn_autohideoutput}}",ScaledSize(6),ScaledSize(190),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
@@ -1409,7 +1420,7 @@ Type TOptionsRequester Extends TPanelRequester
 		styles[QUOTED]=TTextStyle.Create("{{options_editor_label_strings}}:",ScaledSize(6),ScaledSize(138),w)
 		styles[KEYWORD]=TTextStyle.Create("{{options_editor_label_keywords}}:",ScaledSize(6),ScaledSize(172),w)
 		styles[NUMBER]=TTextStyle.Create("{{options_editor_label_numbers}}:",ScaledSize(6),ScaledSize(206),w)
-		styles[MATCHING]=TTextStyle.Create("{{options_editor_label_matchings}}:",ScaledSize(6),ScaledSize(240),w)
+		styles[OPERATOR_STYLE]=TTextStyle.Create("Operators:",ScaledSize(6),ScaledSize(240),w)
 		styles[ERROR]=TTextStyle.Create("{{options_editor_label_errors}}:",ScaledSize(6),ScaledSize(274),w)
 
 		caretstyle = TCaretStyle.Create("{{options_editor_label_caret}}:",ScaledSize(6),ScaledSize(308),w)
@@ -3914,7 +3925,6 @@ Type TOpenCode Extends TToolPanel
 	Field	oldpos,oldlen
 	Field	isbmx,isc,iscpp,ishtml
 	Field	deferpos = -1
-	Field tidyqueue1 = -1, tidyqueue2 = -1
 	Field	editmenu:TGadget
 	Field	codenode:TCodeNode
 	Field	dirtynode,uc,nativeundo
@@ -4149,8 +4159,6 @@ Type TOpenCode Extends TToolPanel
 			EndIf
 			cursorline=l
 			UpdateStatus()
-			BracketMatching(cleansrcl)
-			If (tidyqueue1 >= 0 Or tidyqueue2 >= 0) Then UpdateCode()
 			' NGide: niente PollSystem qui.
 			' UpdateCursor viene gia' eseguito dall'event loop; un secondo pump
 			' ad ogni movimento/selezione del cursore rallenta l'editor.
@@ -4197,6 +4205,7 @@ Type TOpenCode Extends TToolPanel
 		Return d
 	End Method
 
+
 	Method UpdateCode(makeundo=True)
 		Local	cpos
 		Local src$ = TextAreaText(textarea)
@@ -4211,7 +4220,7 @@ Type TOpenCode Extends TToolPanel
 			SetCode src,d
 			If d.textchange Then dirtynode=True
 		EndIf
-		If (deferpos >= 0) Or (tidyqueue1 >= 0) Or (tidyqueue2 >= 0) Then SetCode src
+		If deferpos >= 0 Then SetCode src
 	End Method
 
 	Method Undo()
@@ -4279,8 +4288,15 @@ Type TOpenCode Extends TToolPanel
 					Local style:TTextStyle = host.options.styles[i]
 					TextAreaSetHighlightStyle(textarea, i, style.flags, style.color.red, style.color.green, style.color.blue)
 				Next
-				Local style:TTextStyle = host.options.styles[ERROR]
-				TextAreaSetHighlightStyle(textarea, 5, style.flags, style.color.red, style.color.green, style.color.blue)
+				' Operators are NOT bracket matches.  Keep the two styles independent.
+				Local opstyle:TTextStyle = host.options.styles[OPERATOR_STYLE]
+				If isbmx Then
+					' BlitzMax lexer operator/punctuation style.
+					TextAreaSetHighlightStyle(textarea, 6, opstyle.flags, opstyle.color.red, opstyle.color.green, opstyle.color.blue)
+				Else
+					' Scintilla C/C++ lexer operator style (SCE_C_OPERATOR = 10).
+					TextAreaSetHighlightStyle(textarea, 10, opstyle.flags, opstyle.color.red, opstyle.color.green, opstyle.color.blue)
+				EndIf
 			End If
 		End If
 
@@ -4299,7 +4315,6 @@ Type TOpenCode Extends TToolPanel
 		TextAreaSetLineNumberEnable textarea, host.lineNumbersVisible
 		TextAreaSetCaretLineBackgroundColor(textarea, host.options.caretStyle.caretLineColor.red, host.options.caretStyle.caretLineColor.green, host.options.caretStyle.caretLineColor.blue,host.options.caretStyle.caretLineAlpha)
 		TextAreaSetCaretLineVisible(textarea, host.options.caretStyle.caretLineVisible)
-		TextAreaSetBracketMatchingColor(textarea, host.options.styles[MATCHING].color.red, host.options.styles[MATCHING].color.green, host.options.styles[MATCHING].color.blue, host.options.styles[MATCHING].flags)
 
 		src=cleansrc
 		cleansrc=""
@@ -4486,13 +4501,11 @@ Type TOpenCode Extends TToolPanel
 	End Method
 
 	Method HasTidyQueue()
-		Return ((deferpos >= 0) Or (tidyqueue1 >= 0) Or (tidyqueue2 >= 0))
+		Return (deferpos >= 0)
 	EndMethod
 
 	Method ClearTidyQueue(start,endpos)
 		If start<=deferpos And deferpos < endpos Then deferpos = -1
-		If start<=tidyqueue1 And tidyqueue1 < endpos Then tidyqueue1 = -1
-		If start<=tidyqueue2 And tidyqueue2 < endpos Then tidyqueue2 = -1
 	EndMethod
 
 	Method SetCode(src$,diff:TDiff=Null)
@@ -4509,6 +4522,7 @@ Type TOpenCode Extends TToolPanel
 				cleansrc=src
 				cleansrcl=src.ToLower()
 			EndIf
+			If isbmx And host.options.syntaxhighlight Then ApplyBmxOperatorHighlight()
 			Return
 		EndIf
 ' doit
@@ -4530,14 +4544,6 @@ Type TOpenCode Extends TToolPanel
 			If (deferpos>=0) Then
 				p = Min(p,deferpos)
 				p1 = Max(p1,deferpos+1)
-			EndIf
-			If (tidyqueue1>=0) Then
-				p = Min(p,tidyqueue1)
-				p1 = Max(p1, tidyqueue1+1)
-			EndIf
-			If (tidyqueue2>=0) Then
-				p = Min(p,tidyqueue2)
-				p1 = Max(p1, tidyqueue2+1)
 			EndIf
 		Else
 			p=firstdiff(src,cleansrc)
@@ -4701,7 +4707,6 @@ Type TOpenCode Extends TToolPanel
 			EndIf
 			p:+1
 		Wend
-		If shouldHighlight BracketMatching(lsrc,startp,p1,True)
 		TextAreaEnableUndoRedo(textarea, True)
 		UnlockTextArea textarea
 		If Not same
@@ -4711,105 +4716,66 @@ Type TOpenCode Extends TToolPanel
 '		CheckDirty src	simon was here
 	End Method
 
-	Field currentbrackets:Int[]
+	' Force a separate Operators colour for BlitzMax punctuation.
+	Method ApplyBmxOperatorHighlight()
+		If Not isbmx Then Return
+		If Not host.options.syntaxhighlight Then Return
+		Local src:String = TextAreaText(textarea)
+		Local op:TTextStyle = host.options.styles[OPERATOR_STYLE]
+		Local inString:Int = False
+		Local inComment:Int = False
+		Local inRemBlock:Int = False
+		Local lineStart:Int = True
 
-	Method BracketMatching(lsrc$,cln1=-1,cln2=-1,alwaysfind:Int = False)
-		
-		If TextAreaHasBracketMatching(textarea) Then
-			TextAreaMatchBrackets(textarea)
-			Return
-		End If
-		
-		Local check:Int, depth:Int, style:TTextStyle[] = host.options.styles
-		Local otherchar:Int = 0, absotherchar:Int = 0, othercharpos:Int = 0, limit:Int
-		Local currentchar:Int = 0, currentcharpos:Int = Max(cursorpos-1,0)
+		For Local p:Int = 0 Until src.length
+			Local ch:Int = src[p]
 
-		If cursorlen Then Return
-
-		If currentbrackets Then
-			If Not(cln2 > currentbrackets[0] And cln1 <= currentbrackets[0]) Then
-				If currentbrackets[0]>-1 Then tidyqueue1 = currentbrackets[0]
-			EndIf
-			If Not(cln2 > currentbrackets[1] And cln1 <= currentbrackets[1]) Then
-				If currentbrackets[1]>-1 Then tidyqueue2 = currentbrackets[1]
-			EndIf
-			currentbrackets = Null
-			If Not alwaysfind Then Return
-		EndIf
-
-		If host.options.bracketmatching And isbmx And Not IsRemmed(currentcharpos,lsrc) Then
-
-			limit = Min(lsrc.length,currentcharpos+2)
-
-			While currentcharpos >= 0 And currentcharpos < limit
-				If IsCode(lsrc,currentcharpos) Then
-					Select lsrc[currentcharpos]
-						Case Asc("(");otherchar = Asc(")");Exit
-						Case Asc("{");otherchar = Asc("}");Exit
-						Case Asc("[");otherchar = Asc("]");Exit
-						' Negate char code to search backwards
-						Case Asc(")");otherchar = -Asc("(");Exit
-						Case Asc("}");otherchar = -Asc("{");Exit
-						Case Asc("]");otherchar = -Asc("[");Exit
-					EndSelect
-				EndIf
-				currentcharpos:+1
-			Wend
-
-			If otherchar Then
-
-				absotherchar = Abs(otherchar)
-				currentchar = lsrc[currentcharpos]
-
-				LockTextArea textarea
-				style[MATCHING].format(textarea, currentcharpos, 1)
-				currentbrackets = [currentcharpos,-1]
-
-				othercharpos =  currentcharpos+(otherchar/absotherchar)
-
-				While othercharpos < lsrc.length And othercharpos >= 0
-
-					If IsCode(lsrc,othercharpos) Then
-						Select lsrc[othercharpos]
-							Case Asc(" "), Asc("~t")
-								'Do nothing
-							Case Asc("'")
-								Exit
-							Case absotherchar
-								If check < 0 Then Exit Else check = 0
-								If depth Then
-									depth:-1
-								Else
-									style[MATCHING].format(textarea, othercharpos, 1)
-									currentbrackets[1] = othercharpos
-									UnlockTextArea textarea
-									Return
-								EndIf
-							Case Asc("~n")
-								If (otherchar/absotherchar) > 0 Then
-									If check = 2 Then check = 0 Else Exit
-								Else
-									If check < 0 Then Exit Else check = -2
-								EndIf
-							Case Asc(".")
-								check:+1
-							Default
-								If check < 0 Then Exit Else check = 0
-								If lsrc[othercharpos] = lsrc[currentcharpos] Then depth:+1
-						EndSelect
-					EndIf
-
-					othercharpos:+(otherchar/absotherchar)
-
+			' At the beginning of every physical line, detect BlitzMax REM/ENDREM blocks.
+			' Operators inside those blocks must keep the Remarks colour.
+			If lineStart Then
+				Local q:Int = p
+				While q < src.length And (src[q]=32 Or src[q]=9)
+					q:+1
 				Wend
-
-				UnlockTextArea textarea
-
+				Local e:Int = q
+				While e < src.length And src[e]<>10 And src[e]<>13 And src[e]<>32 And src[e]<>9
+					e:+1
+				Wend
+				Local firstWord:String = src[q..e].ToLower()
+				If firstWord="endrem" Then
+					inRemBlock=False
+				ElseIf firstWord="rem" Then
+					inRemBlock=True
+				EndIf
+				lineStart=False
 			EndIf
 
-		EndIf
+			If ch=10 Or ch=13 Then
+				inComment=False
+				inString=False
+				lineStart=True
+				Continue
+			EndIf
 
-	EndMethod
+			If inRemBlock Then Continue
+			If inComment Then Continue
+
+			If ch=34 Then
+				inString = Not inString
+				Continue
+			EndIf
+			If Not inString And ch=39 Then
+				inComment=True
+				Continue
+			EndIf
+			If inString Then Continue
+
+			Select ch
+				Case 40,41,91,93,123,125,61,43,45,42,47,60,62,38,124,126,94,58
+					op.format(textarea,p,1)
+			End Select
+		Next
+	End Method
 
 	Method AutoIndent()
 		Local	p,q
@@ -5286,12 +5252,12 @@ Type TOpenCode Extends TToolPanel
 			Select ExtractExt(path).ToLower()
 				Case "bmx"
 					lang = "blitzmax"
-					If host.quickhelp Then
-						keywords[0] = host.quickhelp.tokens
-					End If
-				Case "bmk","lua"
-					lang = "lua"
-					keywords[0] = KEYWORDS_LUA
+					' Keep syntax highlighting independent from QuickHelp/documentation.
+					keywords[0] = KEYWORDS_BLITZMAX
+				Case "bmk"
+					' BlitzMax build scripts: use the BlitzMax keyword set.
+					lang = "blitzmax"
+					keywords[0] = KEYWORDS_BLITZMAX
 				Case "c"
 					lang = "cpp"
 					keywords[0] = KEYWORDS_C
@@ -5300,9 +5266,6 @@ Type TOpenCode Extends TToolPanel
 					lang = "cpp"
 					keywords[0] = KEYWORDS_CPP
 					keywords[4] = KEYWORDS_CPP_PP
-				Case "mm", "m"
-					lang = "cpp"
-					keywords[0] = KEYWORDS_OBJC
 				Case "htm","html","shtml","htt","cfm","tpl","hta"
 					lang = "html"
 				Case "xml","gcl","xsl","svg","xul","xsd","dtd","xslt","axl"
@@ -5349,6 +5312,16 @@ Type TOpenCode Extends TToolPanel
 		SetGadgetFilter code.textarea,code.FilterKey,code
 		SetTextAreaText code.textarea,"~n"
 		SetGadgetLayout code.textarea,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED
+		' Determine the source language BEFORE RefreshStyle().
+		' RefreshStyle needs isbmx=True to assign SCE_B_OPERATOR (style 6)
+		' to the Operators colour. Previously this flag was set too late, so
+		' BlitzMax files incorrectly received the C/C++ operator style (10).
+		Local sourceExt:String = ExtractExt(path).ToLower()
+		If sourceExt="bmx" Or sourceExt="bmk" Then code.isbmx=True
+		If sourceExt="c" Then code.isc=True
+		If sourceExt="cc" Or sourceExt="cpp" Or sourceExt="cxx" Or sourceExt="h" Or sourceExt="hh" Or sourceExt="hpp" Or sourceExt="hxx" Then code.iscpp=True
+		If sourceExt="html" Or sourceExt="htm" Then code.ishtml=True
+
 		code.SetLanguage(path)
 		code.RefreshStyle()
 		code.nativeundo = TextAreaHasUndoRedo(code.textarea)
@@ -5362,21 +5335,20 @@ Type TOpenCode Extends TToolPanel
 			code.ReadSource(path)
 		EndIf
 
-		If ExtractExt(path).toLower()="bmx" code.isbmx=True
-		If ExtractExt(path).toLower()="c" code.isc=True
-		If ExtractExt(path).toLower()="cpp" code.iscpp=True
-		If ExtractExt(path).toLower()="cxx" code.iscpp=True
-		If ExtractExt(path).toLower()="h" code.iscpp=True
-		If ExtractExt(path).toLower()="html" code.ishtml=True
-		If ExtractExt(path).toLower()="htm" code.ishtml=True
 		code.UpdateCode False
 		code.filesrc=TextAreaText(code.textarea)
 		TextAreaClearUndoRedo(code.textarea)
 		If host.options.syntaxhighlight And TextAreaHasHighlighting(code.textarea) Then
 			TextAreaHighlight(code.textarea)
+			code.ApplyBmxOperatorHighlight()
 		End If
 		Return code
 	End Function
+
+	' BlitzMax / BlitzMax NG language keywords used only by the editor lexer.
+	' This list is deliberately local: QuickHelp no longer controls syntax colouring.
+	Const KEYWORDS_BLITZMAX:String = "abstract alias and array asc assert auto break case catch continue const defdata default delete each else elseif end endextern endfunction endif endmethod endselect endtype endwhile exit extern false field final finally float for forever function global if implements import incbin include inline int interface local long max method mod module new next not null object or private protected public ptr read restore repeat return select self short step strict string super then throw to true try type until var void wend while xor " + ..
+		"byte double uint ulong ushort size_t ssize_t byte_ptr short_ptr int_ptr long_ptr float_ptr double_ptr varptr chr len mid left right instr upper lower trim lset rset replace fromhex tohex binary min max abs sgn floor ceil sin cos tan asin acos atan atan2 sqr log exp pow rand rnd seedrnd millisecs currentdate currenttime appargs getenv setenv system delay debuglog print input stop end"
 
 	Const KEYWORDS_C:String = "auto break case char const continue default do double else enum extern float for goto if int long " + ..
 		"register return short signed sizeof static struct switch typedef union unsigned void volatile while"
@@ -5390,12 +5362,6 @@ Type TOpenCode Extends TToolPanel
 
 	Const KEYWORDS_CPP_PP:String = "#include #define #undef #if #ifdef #ifndef #error __FILE__ __LINE__ __DATE__ __TIME__ __TIMESTAMP__ pragma"
 
-	Const KEYWORDS_OBJC:String = "auto else long switch break enum register typedef case extern return union char float short " + ..
-		"unsigned const for signed void continue goto sizeof volatile default if static while do int " + ..
-		"struct _Packed double protocol interface implementation NSObject NSInteger NSNumber CGFloat " + ..
-		"property nonatomic retain strong weak unsafe_unretained readwrite readonly"
-
-	Const KEYWORDS_LUA:String = "and break do else elseif end false for function if in local nil not or repeat return then true until while"
 End Type
 
 Type TRect
@@ -6246,7 +6212,7 @@ Type TCodePlay
 		Try
 			bmxpath=BlitzMaxPath()
 		Catch err$
-			Notify "Unable to determine BlitzMax installation directory."
+			Notify "Unable to determine NG installation directory."
  			End
 		EndTry
 
