@@ -4235,18 +4235,54 @@ Type TOpenCode Extends TToolPanel
 			SetTextAreaColor textarea,rgb.red,rgb.green,rgb.blue,False
 		Else
 			If host.options.syntaxhighlight
-				For Local i:Int = 0 Until 5
-					Local style:TTextStyle = host.options.styles[i]
-					TextAreaSetHighlightStyle(textarea, i, style.flags, style.color.red, style.color.green, style.color.blue)
-				Next
-				' Gli Operatori NON sono corrispondenze di parentesi. Mantieni indipendenti i due stili.
 				Local opstyle:TTextStyle = host.options.styles[OPERATOR_STYLE]
 				If isbmx Then
-					' Stile operatore/punteggiatura del lexer BlitzMax.
+					' Scintilla BlitzMax lexer: gli ID del lexer NON coincidono con
+					' gli indici della finestra Options. Mappatura esplicita:
+					' 0=default, 1=comment, 2=number, 3=keyword, 4=string, 6=operator.
+					' In particolare SCE_B_OPERATOR=6 resta completamente indipendente
+					' da SCE_B_COMMENT=1 quando si cambiano i colori dalle Options.
+					Local plainstyle:TTextStyle = host.options.styles[NORMAL]
+					Local remstyle:TTextStyle = host.options.styles[COMMENT]
+					Local strstyle:TTextStyle = host.options.styles[QUOTED]
+					Local keystyle:TTextStyle = host.options.styles[KEYWORD]
+					Local numstyle:TTextStyle = host.options.styles[NUMBER]
+					TextAreaSetHighlightStyle(textarea, 0, plainstyle.flags, plainstyle.color.red, plainstyle.color.green, plainstyle.color.blue)
+					TextAreaSetHighlightStyle(textarea, 1, remstyle.flags, remstyle.color.red, remstyle.color.green, remstyle.color.blue)
+					' NGide 36: nel lexer BlitzMax usato da questa build gli slot 2 e 4
+					' risultano invertiti rispetto alla mappatura attesa: 2=stringa, 4=numero.
+					' Correggiamo SOLO Strings/Numbers; Remarks e Operators restano invariati.
+					TextAreaSetHighlightStyle(textarea, 2, strstyle.flags, strstyle.color.red, strstyle.color.green, strstyle.color.blue)
+					TextAreaSetHighlightStyle(textarea, 3, keystyle.flags, keystyle.color.red, keystyle.color.green, keystyle.color.blue)
+					TextAreaSetHighlightStyle(textarea, 4, numstyle.flags, numstyle.color.red, numstyle.color.green, numstyle.color.blue)
+					' NGide 28: nessuna FormatTextAreaText sugli operatori.
+					' Il lexer BlitzMax/Basic usa normalmente SCE_B_OPERATOR=6; alcune build
+					' storiche del wrapper espongono la punteggiatura sullo slot 5.
+					' Entrambi sono quindi riservati ESCLUSIVAMENTE a Operators.
+					TextAreaSetHighlightStyle(textarea, 5, opstyle.flags, opstyle.color.red, opstyle.color.green, opstyle.color.blue)
 					TextAreaSetHighlightStyle(textarea, 6, opstyle.flags, opstyle.color.red, opstyle.color.green, opstyle.color.blue)
-				Else
-					' Stile operatore del lexer C/C++ di Scintilla (SCE_C_OPERATOR = 10).
-					TextAreaSetHighlightStyle(textarea, 10, opstyle.flags, opstyle.color.red, opstyle.color.green, opstyle.color.blue)
+					' Stati aggiuntivi del lexer Basic: mantieni commenti/stringhe/keyword separati.
+					TextAreaSetHighlightStyle(textarea, 9, strstyle.flags, strstyle.color.red, strstyle.color.green, strstyle.color.blue)
+					TextAreaSetHighlightStyle(textarea, 10, keystyle.flags, keystyle.color.red, keystyle.color.green, keystyle.color.blue)
+					TextAreaSetHighlightStyle(textarea, 11, keystyle.flags, keystyle.color.red, keystyle.color.green, keystyle.color.blue)
+					TextAreaSetHighlightStyle(textarea, 12, keystyle.flags, keystyle.color.red, keystyle.color.green, keystyle.color.blue)
+					TextAreaSetHighlightStyle(textarea, 19, remstyle.flags, remstyle.color.red, remstyle.color.green, remstyle.color.blue)
+				ElseIf isc Or iscpp Then
+					' NGide 40: SetHighlightStyle usa gli indici LOGICI del wrapper MaxGUI,
+					' non gli ID SCE_C_* grezzi del lexer C/C++.
+					' Usa quindi esattamente la stessa corrispondenza delle Options:
+					' 0=Plain, 1=Remarks, 2=Strings, 3=Keywords, 4=Numbers, 5=Operators.
+					Local plainstyle:TTextStyle = host.options.styles[NORMAL]
+					Local remstyle:TTextStyle = host.options.styles[COMMENT]
+					Local strstyle:TTextStyle = host.options.styles[QUOTED]
+					Local keystyle:TTextStyle = host.options.styles[KEYWORD]
+					Local numstyle:TTextStyle = host.options.styles[NUMBER]
+					TextAreaSetHighlightStyle(textarea, 0, plainstyle.flags, plainstyle.color.red, plainstyle.color.green, plainstyle.color.blue)
+					TextAreaSetHighlightStyle(textarea, 1, remstyle.flags, remstyle.color.red, remstyle.color.green, remstyle.color.blue)
+					TextAreaSetHighlightStyle(textarea, 2, strstyle.flags, strstyle.color.red, strstyle.color.green, strstyle.color.blue)
+					TextAreaSetHighlightStyle(textarea, 3, keystyle.flags, keystyle.color.red, keystyle.color.green, keystyle.color.blue)
+					TextAreaSetHighlightStyle(textarea, 4, numstyle.flags, numstyle.color.red, numstyle.color.green, numstyle.color.blue)
+					TextAreaSetHighlightStyle(textarea, 5, opstyle.flags, opstyle.color.red, opstyle.color.green, opstyle.color.blue)
 				EndIf
 			End If
 		End If
@@ -4272,6 +4308,16 @@ Type TOpenCode Extends TToolPanel
 		cleansrcl=""
 		cursorpos=0
 		SetCode(src)
+
+		' Quando i colori vengono cambiati dalle Options, ricostruisci la
+		' colorazione esattamente come all'apertura del sorgente.
+		' SetCode da solo lascia alcuni formati diretti sovrapposti agli stili
+		' del lexer (in particolare Remarks/Operators).
+		If host.options.syntaxhighlight And TextAreaHasHighlighting(textarea) Then
+			TextAreaHighlight(textarea)
+			If isbmx Then ApplyBmxOperatorHighlight()
+			If isc Or iscpp Then ApplyCOperatorHighlight()
+			EndIf
 	End Method
 
 	Function IsntAlphaNumeric(c)		'controllo solo in minuscolo
@@ -4473,8 +4519,6 @@ Type TOpenCode Extends TToolPanel
 				cleansrc=src
 				cleansrcl=src.ToLower()
 			EndIf
-			If isbmx And host.options.syntaxhighlight Then ApplyBmxOperatorHighlight()
-			If (isc Or iscpp) And host.options.syntaxhighlight Then ApplyCOperatorHighlight()
 			Return
 		EndIf
 ' esegui
@@ -4669,65 +4713,105 @@ Type TOpenCode Extends TToolPanel
 	End Method
 
 	' Forza un colore Operatori separato per la punteggiatura BlitzMax.
+	' NGide 30: usa direttamente lo style Scintilla 31, fuori dagli style del lexer BMX.
+	' IMPORTANTE: non usare FormatTextAreaText qui: il suo styleMap interno usa gli
+	' style 0..31 e puo ridefinire gli stessi slot usati da Remarks/Keywords.
 	Method ApplyBmxOperatorHighlight()
 		If Not isbmx Then Return
 		If Not host.options.syntaxhighlight Then Return
-		Local src:String = TextAreaText(textarea)
-		Local op:TTextStyle = host.options.styles[OPERATOR_STYLE]
-		Local inString:Int = False
-		Local inComment:Int = False
-		Local inRemBlock:Int = False
-		Local lineStart:Int = True
+		If Not TextAreaHasHighlighting(textarea) Then Return
 
-		For Local p:Int = 0 Until src.length
+		?win32
+		Local sci:TWindowsScintillaTextArea = TWindowsScintillaTextArea(textarea)
+		If Not sci Then Return
+
+		' NGide 35: riserva esplicitamente lo style 6 agli operatori BMX.
+		' SetStyle normalmente sceglie lo style tramite la propria cache circolare;
+		' qui eliminiamo prima l'eventuale associazione del colore Operators e
+		' forziamo styleIndex=6, cosi Remarks (style 1) non viene mai riutilizzato.
+		Local op:TTextStyle = host.options.styles[OPERATOR_STYLE]
+		Local opStyleValue:Int = op.color.red Shl 24 | op.color.green Shl 16 | op.color.blue Shl 8 | (op.flags & $ff)
+		Local opStyleKey:String = String(opStyleValue)
+		If sci.styleMap.ValueForKey(opStyleKey) Then sci.styleMap.Remove(opStyleKey)
+		sci.styleIndex = 6
+		sci.lastStyleValue = -1
+		' Configura realmente lo style 6 e lo applica temporaneamente al primo
+		' carattere; subito dopo UpdateCode/questa routine assegna lo style solo
+		' agli operatori individuati. Se il testo e vuoto non c'e nulla da fare.
+
+		Local src:String = TextAreaText(textarea)
+		If src.length = 0 Then Return
+		sci.SetStyle(op.color.red, op.color.green, op.color.blue, op.flags, 0, 0, TEXTAREA_CHARS)
+
+		Local lsrc:String = src.ToLower()
+		Local inString:Int = False
+		Local inLineComment:Int = False
+		Local inRem:Int = False
+		Local lineStart:Int = True
+		Local p:Int = 0
+
+		While p < src.length
 			Local ch:Int = src[p]
 
-			' All inizio di ogni riga fisica, rileva i blocchi REM/ENDREM di BlitzMax.
-			' Gli Operatori dentro questi blocchi devono mantenere il colore dei Remarks.
+			If ch = 10 Or ch = 13 Then
+				inLineComment = False
+				lineStart = True
+				p:+1
+				Continue
+			EndIf
+
 			If lineStart Then
-				Local q:Int = p
-				While q < src.length And (src[q]=32 Or src[q]=9)
-					q:+1
-				Wend
-				Local e:Int = q
-				While e < src.length And src[e]<>10 And src[e]<>13 And src[e]<>32 And src[e]<>9
-					e:+1
-				Wend
-				Local firstWord:String = src[q..e].ToLower()
-				If firstWord="endrem" Then
-					inRemBlock=False
-				ElseIf firstWord="rem" Then
-					inRemBlock=True
+				If ch = 32 Or ch = 9 Then
+					p:+1
+					Continue
 				EndIf
-				lineStart=False
+				If inRem Then
+					If lsrc[p..Min(p + 6, lsrc.length)] = "endrem" Then inRem = False
+				Else
+					If lsrc[p..Min(p + 3, lsrc.length)] = "rem" Then inRem = True
+				EndIf
+				lineStart = False
 			EndIf
 
-			If ch=10 Or ch=13 Then
-				inComment=False
-				inString=False
-				lineStart=True
+			If inRem Or inLineComment Then
+				p:+1
 				Continue
 			EndIf
 
-			If inRemBlock Then Continue
-			If inComment Then Continue
-
-			If ch=34 Then
-				inString = Not inString
+			If inString Then
+				If ch = 126 Then
+					p:+2
+					Continue
+				EndIf
+				If ch = 34 Then inString = False
+				p:+1
 				Continue
 			EndIf
-			If Not inString And ch=39 Then
-				inComment=True
+
+			If ch = 34 Then
+				inString = True
+				p:+1
 				Continue
 			EndIf
-			If inString Then Continue
+			If ch = 39 Then
+				inLineComment = True
+				p:+1
+				Continue
+			EndIf
 
-			Select ch
-				Case 40,41,123,125,61,43,45,42,47,60,62,38,124,126,94,58
-					op.format(textarea,p,1)
-			End Select
-		Next
+			If IsBmxOperatorChar(ch) Then sci.applyStyle(p, 1, TEXTAREA_CHARS, 6)
+			p:+1
+		Wend
+		?
 	End Method
+
+	Function IsBmxOperatorChar:Int(ch:Int)
+		Select ch
+			Case 33,35,36,37,38,40,41,42,43,44,45,46,47,58,60,61,62,63,64,91,92,93,94,123,124,125
+				Return True
+		End Select
+		Return False
+	End Function
 
 
 	' Forza il colore Operatori anche per la punteggiatura C/C++.
@@ -4919,6 +5003,8 @@ Type TOpenCode Extends TToolPanel
 						PopupWindowMenu host.window,editmenu
 					Case EVENT_GADGETACTION
 						UpdateCode
+						If isbmx Then ApplyBmxOperatorHighlight()
+						If isc Or iscpp Then ApplyCOperatorHighlight()
 					Case EVENT_GADGETSELECT
 						UpdateCursor
 				End Select
@@ -5373,8 +5459,6 @@ Type TOpenCode Extends TToolPanel
 		TextAreaClearUndoRedo(code.textarea)
 		If host.options.syntaxhighlight And TextAreaHasHighlighting(code.textarea) Then
 			TextAreaHighlight(code.textarea)
-			code.ApplyBmxOperatorHighlight()
-			code.ApplyCOperatorHighlight()
 		End If
 		Return code
 	End Function
