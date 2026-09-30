@@ -1,9 +1,10 @@
-' maxide.bmx
+' NGide.bmx
 
-' BlitzMax native integrated development environment
+' NG native integrated development environment
 
 ' Copyright (c) 2005-2014 Simon Armstrong, Blitz Research Limited
 ' Copyright (c) 2015-2022 Bruce A Henderson
+' 2026 Modded Windows version by Davy Bartoloni
 
 ' Permission is hereby granted, free of charge, to any person obtaining a copy
 ' of this software and associated documentation files (the "Software"), to deal
@@ -25,19 +26,14 @@
 
 Strict
 
-' WINDOWS-ONLY EDITION - Linux/macOS host compatibility removed.
-' Unused embedded resources removed after static reference check.
-
 Framework brl.standardio
 
 Import MaxGUI.Win32MaxGUIEx
 Import MaxGUI.maxguitextareascintilla
 Import MaxGUI.ProxyGadgets
-
 Import brl.eventqueue
 Import brl.filesystem
 Import brl.system
-'Import brl.ramstream
 Import pub.freeprocess
 Import brl.pngloader
 Import brl.timer
@@ -55,13 +51,13 @@ Const DEFAULT_LANGUAGEPATH$ = "incbin::default.language.ini"
 Incbin "window_icon.png"
 
 Const IDE_NAME$="NGide"
-Const IDE_VERSION$="1.15 [2027]"
+Const IDE_VERSION$="1.18 [2027]"
 Const TIMER_FREQUENCY=15
 
 AppTitle = IDE_NAME + " " + IDE_VERSION
 
 Extern
-	Global _bbusew	'secret 'NT' flag
+	Global _bbusew	'flag 'NT' segreto
 End Extern
 
 If Not _bbusew
@@ -69,7 +65,7 @@ If Not _bbusew
 	End
 EndIf
 
-Global BCC_VERSION$="{unknown}"	'not valid until codeplay opened
+Global BCC_VERSION$="{unknown}"	'non valido finche CodePlay non viene aperto
 
 Const EOL$="~n"
 
@@ -193,7 +189,7 @@ Const MENURECENT=256
 Const TAB$=Chr(9)
 Const QUOTES$=Chr(34)
 
-'values assigned for the shortcut (OS specific)
+'valori assegnati alla scorciatoia (specifici del sistema operativo)
 Global lastTabKey:Int
 Global lastTabMod:Int
 
@@ -215,12 +211,12 @@ Wend
 
 End
 
-Function Quote$(a$)		'add quotes to arg if spaces found
+Function Quote$(a$)		'aggiunge le virgolette all argomento se contiene spazi
 	Local	p
 	If Not a.length Return
-	If a[0]=34 Return a	'already quoted
+	If a[0]=34 Return a	'gia tra virgolette
 	p=a.find(" ")
-	If p=-1 Return a	'no spaces
+	If p=-1 Return a	'nessuno spazio
 	Return Chr(34)+a+Chr(34)
 End Function
 
@@ -237,7 +233,7 @@ Type TToken
 End Type
 
 Type TQuickHelp
-	Field map:TMap=New TMap	'key=lower(token) value=token:TToken
+	Field map:TMap=New TMap	'chiave=lower(token) valore=token:TToken
 	Field tokens:String
 
 	Method AddCommand:TQuickHelp(t$,l$,a$)
@@ -424,51 +420,6 @@ Type TRequester
 	Method Poll()
 	End Method
 End Type
-
-Rem
-Type TProgressRequester Extends TRequester
-	Field	message$,value
-	Field	showing
-	Field	label:TGadget
-	Field	progbar:TGadget
-
-	Method Show()	'returns false if cancelled
-		showing=True
-		Super.Show
-	End Method
-
-	Method Hide()
-		showing=False
-		Super.Hide()
-	End Method
-
-	Method Open(title$)
-		SetGadgetText window,title
-		Show
-	End Method
-
-	Method Update(msg$,val)
-		If msg$<>message
-			message=msg
-			If label FreeGadget label
-			label=CreateLabel(message,8,8,260,20,window)
-		EndIf
-		If showing And (val&$fc)<>(value&$fc)	'only update every 4 percent
-			UpdateProgBar( progbar,val/100.0 )
-			PollSystem
-		EndIf
-		value=val
-	End Method
-
-	Function Create:TProgressRequester(host:TCodePlay)
-		Local	progress:TProgressRequester
-		progress=New TProgressRequester
-		progress.initrequester(host,"{{progress_window_title}}",280,128,STYLE_CANCEL)
-		progress.progbar=CreateProgBar( 8,32,260,20,progress.window )
-		Return progress
-	End Function
-End Type
-EndRem
 
 Type TPanelRequester Extends TRequester
 	Field	tabber:TGadget
@@ -998,17 +949,17 @@ Const OPERATOR_STYLE=5
 Const ERROR=6
 
 Type TOptionsRequester Extends TPanelRequester
-' panels
+' pannelli
 	Field	optionspanel:TGadget,editorpanel:TGadget,toolpanel:TGadget,appstubpanel:TGadget
-' settings
+' impostazioni
 	Field	showtoolbar,restoreopenfiles,autocapitalize,syntaxhighlight,autobackup,autoindent,hideoutput
 	Field	systemkeys,sortcode,restartaftershutdown
 	Field	tabsize,language$
 	Field	editfontname$,editfontsize,editcolor:TColor
 	Field	outputfontname$,outputfontsize,outputcolor:TColor
-' states
+' stati
 	Field	editfont:TGUIFont
-' gadgets
+' gadget
 	Field languages:TGadget
 	Field	tabbutton:TGadget
 	Field	editpanel:TGadget,editbutton:TGadget
@@ -1064,7 +1015,7 @@ Type TOptionsRequester Extends TPanelRequester
 		styles[QUOTED].set( $00ff66,0 )
 		styles[KEYWORD].set( $ffff00,0 )
 		styles[NUMBER].set( $40ffff,0 )
-		' Operators and brackets use their own normal lexer style.
+		' Operatori e parentesi usano il proprio stile normale del lexer.
 		styles[OPERATOR_STYLE].set( $ff80ff,0 )
 		styles[ERROR].set( $ff2020,TEXTFORMAT_BOLD )
 		outputstyle.set(0,-1,GUIFONT_MONOSPACED)
@@ -1098,9 +1049,9 @@ Type TOptionsRequester Extends TPanelRequester
 		stream.WriteLine "number_style="+styles[NUMBER].ToString()
 		stream.WriteLine "operator_style="+styles[OPERATOR_STYLE].ToString()
 		stream.WriteLine "error_style="+styles[ERROR].ToString()
-		stream.WriteLine "console_style="+outputstyle.ToString()	'Renamed from 'output_style' to bump users to default monospace font.
+		stream.WriteLine "console_style="+outputstyle.ToString()	'Rinominato da 'output_style' per riportare gli utenti al font monospaziato predefinito.
 		stream.WriteLine "console_linenumber_style="+outputLineNumberStyle.ToString()
-		stream.WriteLine "navi_style="+navstyle.ToString()	'Renamed from 'nav_style' to bump users to default treeview font.
+		stream.WriteLine "navi_style="+navstyle.ToString()	'Rinominato da 'nav_style' per riportare gli utenti al font predefinito della vista ad albero.
 		stream.WriteLine "hide_output="+hideoutput
 		stream.WriteLine "system_keys="+systemkeys
 		stream.WriteLine "sort_code="+sortcode
@@ -1140,9 +1091,9 @@ Type TOptionsRequester Extends TPanelRequester
 				Case "number_style" styles[NUMBER].FromString(b)
 				Case "operator_style" styles[OPERATOR_STYLE].FromString(b)
 				Case "error_style" styles[ERROR].FromString(b)
-				Case "console_style" outputstyle.FromString(b)	'Renamed from 'output_style' to bump users to default monospace font.
+				Case "console_style" outputstyle.FromString(b)	'Rinominato da 'output_style' per riportare gli utenti al font monospaziato predefinito.
 				Case "console_linenumber_style" outputLineNumberStyle.FromString(b)
-				Case "navi_style" navstyle.FromString(b)	'Renamed from 'nav_style' to bump users to default treeview font.
+				Case "navi_style" navstyle.FromString(b)	'Rinominato da 'nav_style' per riportare gli utenti al font predefinito della vista ad albero.
 				Case "hide_output" hideoutput=t
 				Case "system_keys" systemkeys=t
 				Case "sort_code" sortcode=t
@@ -1165,14 +1116,14 @@ Type TOptionsRequester Extends TPanelRequester
 			End If
 		Wend
 
-		' NGide 1.15: migrate the temporary Operators colour used by NGide_15.
-		' The old salmon colour was too easy to confuse with Remarks.
-		' Operators now start magenta, but remain independently configurable.
+		' NGide 1.15: migra il colore temporaneo degli Operatori usato da NGide_15.
+		' Il vecchio colore salmone era troppo facile da confondere con i Remarks.
+		' Gli Operatori ora partono in magenta, ma restano configurabili indipendentemente.
 		If styles[OPERATOR_STYLE].color.red=255 And styles[OPERATOR_STYLE].color.green=128 And styles[OPERATOR_STYLE].color.blue=128 Then
 			styles[OPERATOR_STYLE].set($ff80ff,0)
 		EndIf
-		' Also separate old configurations where Operators and Remarks accidentally
-		' ended up with exactly the same colour.
+		' Separa anche le vecchie configurazioni in cui Operatori e Remarks accidentalmente
+		' finivano con esattamente lo stesso colore.
 		If styles[OPERATOR_STYLE].color.red=styles[COMMENT].color.red And ..
 		   styles[OPERATOR_STYLE].color.green=styles[COMMENT].color.green And ..
 		   styles[OPERATOR_STYLE].color.blue=styles[COMMENT].color.blue Then
@@ -1186,7 +1137,7 @@ Type TOptionsRequester Extends TPanelRequester
 		Local	rgb:TColor,flags
 		editfont=LoadGuiFont(editfontname,editfontsize)
 
-		'Language Loading / Enumeration
+		'Caricamento / enumerazione lingue
 		ClearGadgetItems languages
 		AddGadgetItem languages, "English (English) [Embedded]", GADGETITEM_DEFAULT,-1,"",DEFAULT_LANGUAGEPATH
 		For Local tmpFile$ = EachIn LoadDir( host.bmxpath+"/cfg", True )
@@ -1374,9 +1325,9 @@ Type TOptionsRequester Extends TPanelRequester
 	Method InitOptionsRequester(host:TCodePlay)
 		Local	w:TGadget
 		InitPanelRequester(host,"{{options_window_title}}", ScaledSize(420), ScaledSize(564))
-' init values
+' inizializza valori
 		editcolor=New TColor
-' init gadgets
+' init gadget
 		optionspanel=AddPanel("{{options_optionstab}}")
 		editorpanel=AddPanel("{{options_editortab}}")
 		toolpanel=AddPanel("{{options_toolstab}}")
@@ -1391,12 +1342,12 @@ Type TOptionsRequester Extends TPanelRequester
 		w=optionspanel
 
 		buttons[0]=CreateButton("{{options_options_btn_showtoolbar}}",ScaledSize(6),ScaledSize(6),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
-		HideGadget buttons[0] ' legacy toolbar option removed
+		HideGadget buttons[0] ' opzione toolbar precedente rimossa
 		buttons[1]=CreateButton("{{options_options_btn_autorestore}}",ScaledSize(6),ScaledSize(34),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 		buttons[2]=CreateButton("{{options_options_btn_autocaps}}",ScaledSize(6),ScaledSize(60),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 		buttons[3]=CreateButton("{{options_options_btn_syntaxhighlight}}",ScaledSize(6),ScaledSize(86),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 		buttons[4]=CreateButton("{{options_options_btn_bracketmatching}}",ScaledSize(6),ScaledSize(112),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
-		HideGadget buttons[4] ' bracket matching removed
+		HideGadget buttons[4] ' corrispondenza parentesi rimossa
 		buttons[5]=CreateButton("{{options_options_btn_autobackup}}",ScaledSize(6),ScaledSize(138),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 		buttons[6]=CreateButton("{{options_options_btn_autoindent}}",ScaledSize(6),ScaledSize(164),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
 		buttons[7]=CreateButton("{{options_options_btn_autohideoutput}}",ScaledSize(6),ScaledSize(190),ClientWidth(w)-ScaledSize(12),ScaledSize(26),w,BUTTON_CHECKBOX)
@@ -1603,7 +1554,7 @@ Type TNode Extends TTool
 	Field	parent:TNode
 	Field	kids:TList=New TList
 	Field	views:TView[]
-' activate program
+' attiva programma
 	Field	target:TTool
 	Field	action
 	Field	argument:Object
@@ -1673,7 +1624,7 @@ Type TNode Extends TTool
 		argument=arg
 	End Method
 
-	Method Hide(v:TView=Null)	'null means hide in all views
+	Method Hide(v:TView=Null)	'null significa nascondi in tutte le viste
 		For Local n:TNode = EachIn kids
 			n.hide v
 		Next
@@ -1840,13 +1791,13 @@ Type TNode Extends TTool
 		If snap.name<>name Return
 		If kids.Count() currentkid=TNode(kids.First())
 		For snapkid=EachIn snap.kids
-' if same name in list
+' se lo stesso nome e nella lista
 			kid=currentkid
 			While kid
 				If kid.name=snapkid.name Exit
 				kid=NodeAfter(kid)
 			Wend
-' then remove entries in front
+' poi rimuove le voci precedenti
 			If kid
 				While currentkid<>kid
 					t=currentkid
@@ -1854,8 +1805,8 @@ Type TNode Extends TTool
 					t.free()
 				Wend
 			EndIf
-' if same name sync else insert
-			If currentkid And currentkid.name=snapkid.name	'merge values if same name
+' se il nome coincide sincronizza, altrimenti inserisce
+			If currentkid And currentkid.name=snapkid.name	'unisce i valori se il nome coincide
 				currentkid.Sync snapkid
 				currentkid=NodeAfter(currentkid)
 			Else
@@ -1869,7 +1820,7 @@ Type TNode Extends TTool
 				snapkid.parent=Self
 			EndIf
 		Next
-' remove any entries at end
+' rimuove eventuali voci alla fine
 		While currentkid
 			t=currentkid
 			currentkid=NodeAfter(currentkid)
@@ -1938,7 +1889,7 @@ Type THelpPanel Extends TToolPanel
 
 		Local map:TMap=New TMap
 
-		'scan for html files
+		'cerca file HTML
 		For Local e$=EachIn LoadDir( path )
 			If e="index.html" Continue
 			Local p$=path+"/"+e
@@ -1952,9 +1903,9 @@ Type THelpPanel Extends TToolPanel
 			End Select
 		Next
 
-		'scan for anchors in index.html...
+		'cerca ancore in index.html...
 		'
-		'note: anchors must be quote enclosed and of simple form <a name="blah">
+		'nota: le ancore devono essere racchiuse tra virgolette e nella forma semplice <a name="blah">
 		Local c$=CacheAndLoadText( t ),i
 		Repeat
 			i=c.Find( "<a name=~q",i )
@@ -2070,7 +2021,7 @@ Type THelpPanel Extends TToolPanel
 		If node
 			node.Highlight
 '		Else
-'			print "node not found"
+'			print "nodo non trovato"
 		EndIf
 		ActivateGadget htmlview
 	End Method
@@ -2228,13 +2179,13 @@ Type TSearchRequester Extends TRequester
 
 	Method SearchPath(pPath$,pFileType$[],pString$,pRecurse% = True)
 
-		pPath$ = RealPath(pPath)						'Make sure we are using a real path
+		pPath$ = RealPath(pPath)						'assicura che venga usato un percorso reale
 
-		Local tmpSearchDir$[] = LoadDir(pPath,True)			'Load directors contents into string array
-		If Not tmpSearchDir Then Return					'Return if the directory is invalid
-		tmpSearchDir.Sort()							'Sort the contents alphabetically
+		Local tmpSearchDir$[] = LoadDir(pPath,True)			'carica il contenuto della directory in un array di stringhe
+		If Not tmpSearchDir Then Return					'ritorna se la directory non e valida
+		tmpSearchDir.Sort()							'ordina alfabeticamente il contenuto
 
-		SetStatusText window, LocalizeString("{{search_msg_searchingdir}}").Replace("%1", pPath)			'And let user know which directory is being searched
+		SetStatusText window, LocalizeString("{{search_msg_searchingdir}}").Replace("%1", pPath)			'e informa l utente su quale directory viene esaminata
 
 		Local tmpFullPath$
 
@@ -2243,8 +2194,8 @@ Type TSearchRequester Extends TRequester
 			tmpFullPath = pPath + "/" + tmpItem
 
 			Select FileType(tmpFullPath)
-				Case FILETYPE_NONE;Continue                              'Skip item if, for whatever reason, it doesn't exist
-				Case FILETYPE_FILE                                       'If file, then check extension and search if valid
+				Case FILETYPE_NONE;Continue                              'salta l elemento se, per qualsiasi motivo, non esiste
+				Case FILETYPE_FILE                                       'se e un file, controlla l estensione ed esegue la ricerca se valida
 					If Not pFileType
 						SearchFile(tmpFullPath,pString)
 					Else
@@ -2253,7 +2204,7 @@ Type TSearchRequester Extends TRequester
 							If tmpExt = tmpValidExt Then SearchFile(tmpFullPath,pString)
 						Next
 					EndIf
-				Case FILETYPE_DIR                                        'If folder, then we might have to search recursively
+				Case FILETYPE_DIR                                        'se e una cartella, potrebbe essere necessario cercare ricorsivamente
 					If pRecurse Then SearchPath(tmpFullPath,pFileType,pString,pRecurse)
 			EndSelect
 
@@ -2261,7 +2212,7 @@ Type TSearchRequester Extends TRequester
 
 		Next
 
-		PollSystem();If PeekEvent() Then host.Poll()			'Let the system update as we could be searching a while
+		PollSystem();If PeekEvent() Then host.Poll()			'consente al sistema di aggiornarsi poiche la ricerca potrebbe durare
 
 	EndMethod
 
@@ -2453,11 +2404,11 @@ End Type
 
 Type TProjectProperties Extends TRequester
 	Field proj:TProjectFolderNode
-	Field newproj:Int = False				'If 'True' then cancel/close deletes project.
+	Field newproj:Int = False				'se 'True', annulla/chiudi elimina il progetto.
 	Field localname:TGadget
 	Field localpath:TGadget
 	Field pathbutton:TGadget
-	Field poprequester:TRequester	'hack for restoring to projectmanager requester
+	Field poprequester:TRequester	'soluzione per ripristinare il requester del project manager
 	Field dirty
 
 	Method Invoke(command,arg:Object=Null)
@@ -2483,7 +2434,7 @@ Type TProjectProperties Extends TRequester
 			Case pathbutton
 				Local dir$=RequestDir(LocalizeString("{{project_requestfolder_title}}"))
 				If dir
-					If dir[dir.length-1..]="/"	'fltk hack
+					If dir[dir.length-1..]="/"	'soluzione FLTK
 						dir=dir[..dir.length-1]
 					EndIf
 					SetGadgetText localpath,dir
@@ -2697,7 +2648,7 @@ Type TFolderNode Extends TNode
 		Case TOOLMENU
 			cmd=Int(String(argument))
 			Select cmd
-			Case 0		'special toolmenu-command=0 fired by rightbutton node context
+			Case 0		'comando speciale toolmenu=0 generato dal menu contestuale del nodo col tasto destro
 				Highlight
 				Local menu:TGadget
 				menu=host.projects.projmenu
@@ -2737,7 +2688,7 @@ Type TProjectFolderNode Extends TFolderNode
 		Local prj$
 		Local isopen
 		If GetState()&OPENSTATE isopen=True
-		'for compatibility issues we enter blank values for 3 svn details
+		'per compatibilita inseriamo valori vuoti per i 3 dettagli SVN
 		prj=name+"|"+path+"| | | |"+isopen+"|"+version
 		Return prj
 	End Method
@@ -2755,7 +2706,7 @@ Type TProjectFolderNode Extends TFolderNode
 		SetName( n )
 		path=GetInfo(info)
 		If path path=owner.host.FullPath(path)
-		'unused 3 values
+		'3 valori inutilizzati
 		GetInfo(info)
 		GetInfo(info)
 		GetInfo(info)
@@ -3064,7 +3015,7 @@ Type TVar Extends TNode
 	Method SetVarName(n$)
 		Local	p
 		name=n
-' if object ref set addr$ field
+' se e un riferimento a oggetto, imposta il campo addr$
 		If name.find("$=")=-1 And name.find( ":String=" )=-1 And name.find(")=$")=-1
 			p=name.find("=$")
 			If p<>-1
@@ -3076,8 +3027,8 @@ Type TVar Extends TNode
 					EndIf
 				EndIf
 				obj=TDebugTree.AddObj(name[p+2..])
-				'Request object dump if we are visible now that
-				'we have updated our own object pointer.
+				'richiede il dump dell oggetto se siamo visibili ora che
+				'abbiamo aggiornato il nostro puntatore all oggetto.
 				If Not IsHidden() Then Request()
 				Return
 			EndIf
@@ -3099,7 +3050,7 @@ Type TVar Extends TNode
 
 	Method SetValue(val:TVar)
 		Local	v:TVar,w:TVar,i,kidsarray:Object[]
-' if this is a reference to same object refresh values
+' se questo e un riferimento allo stesso oggetto, aggiorna i valori
 		If obj And obj=val.obj
 			If kids.IsEmpty()
 				For v=EachIn val.kids
@@ -3120,7 +3071,7 @@ Type TVar Extends TNode
 			EndIf
 			Refresh
 		EndIf
-' recurse so all references are updated
+' ricorsione per aggiornare tutti i riferimenti
 		If IsHidden() Then Return				'parent And parent.state=CLOSEDSTATE Return
 		For v=EachIn kids
 			v.SetValue val
@@ -3240,7 +3191,7 @@ Type TDebugTree Extends TVar
 
 	Method QueueSync( pObj:TObj )
 		If Not pObj Then Return
-		'Sync as soon as the debug pipe is clear
+		'sincronizza non appena la pipe di debug e libera
 		'(see TOuputPanel.SendDumpRequests()).
 		pObj.syncnext = True
 	EndMethod
@@ -3335,7 +3286,7 @@ Type TDebugTree Extends TVar
 				SetStack instack
 				instack=Null
 				inscope=Null
-				'Request first object dumps, and bump sync count
+				'richiede i primi dump degli oggetti e incrementa il contatore di sincronizzazione
 				SyncVars
 				If inexception
 					Notify inexception
@@ -3425,7 +3376,7 @@ Type TNodeView
 
 	Method OnEvent()
 		Local	n:TNode = root.Find(TGadget(EventExtra()),index)
-		If Not n Return	'probably an eventgadgetselect -1 Notify("could not find in root");Return
+		If Not n Return	'probably an eventgadgetelect -1 Notify("could not find in root");Return
 
 		Select EventID()
 			Case EVENT_GADGETSELECT
@@ -3528,7 +3479,7 @@ Type TNavBar Extends TEventHandler
 
 End Type
 
-Type TOutputPanel Extends TToolPanel	'used build and run
+Type TOutputPanel Extends TToolPanel	'usato da Build and Run
 
 	Field	host:TCodePlay
 	Field	output:TGadget
@@ -3633,7 +3584,7 @@ Type TOutputPanel Extends TToolPanel	'used build and run
 	Method Stop()
 		If Not process Return
 
-		'does not exit apps if they use "AppTerminate()" and get debugged
+		'non termina le applicazioni se usano "AppTerminate()" e vengono sottoposte a debug
 		'process.Terminate()
 		process.Kill()
 		FlushPipes process.pipe,process.err
@@ -3865,7 +3816,7 @@ Type TCodeNode Extends TNode
 		Local	p = n.find("'")
 		If p<>-1 n=n[..p]
 		name=n.Trim()
-'		If owner.host.options.sortcode
+'		If owner.host.opzioni.sortcode
 		sortname=n
 	End Method
 
@@ -3877,7 +3828,7 @@ Type TCodeNode Extends TNode
 	Method AddCodeNode:TCodeNode(n$,p0,p1)
 
 		Local t$
-		Local i:Int = n.find(" ")	'if space then group
+		Local i:Int = n.find(" ")	'se c e uno spazio, raggruppa
 
 		If i>0
 			t=n[..i]
@@ -3943,7 +3894,7 @@ Type TOpenCode Extends TToolPanel
 
 	Function WordAtPos$(a$,p)
 		Local	c,q,r,n
-	' string literal
+	' stringa letterale
 		q=a.findlast(EOL$,a.length-p)
 		If q=-1 q=0
 		For q=q To p-1
@@ -3957,8 +3908,8 @@ Type TOpenCode Extends TToolPanel
 			If q=0 q=a.length
 			Return a[r..q]
 		EndIf
-	' alphanumeric
-		p=Min(p,a.length-1)	'simon was here - crash when checking at last char
+	' alfanumerico
+		p=Min(p,a.length-1)	'simon was here - crash durante il controllo dell ultimo carattere
 		For p=p Until 0 Step -1	'simon was here unto->to
 			If IsNotAlpha(a$[p]) Continue
 			Exit
@@ -3999,7 +3950,7 @@ Type TOpenCode Extends TToolPanel
 		src=cleansrcl
 		p1=src.length
 		p=-1;r=-1;t=-1;m=-1;f=-1;l=-1;s=-1;i=-1;en=-1
-		While p<p1			'update rem,type,method,function,label pointers
+		While p<p1			'aggiorna i puntatori rem,type,method,function,label
 			While r<=p
 				r=FindToken("rem",src,r+1)
 			Wend
@@ -4094,7 +4045,7 @@ Type TOpenCode Extends TToolPanel
 		root.name = StripDir(path)
 		root.owner = Self
 		root.count = cleansrc.length
-		If isbmx parsebmx(root) ' stopped code view parse on non bmx files
+		If isbmx parsebmx(root) ' interrompe il parsing della vista codice sui file non BMX
 		If codenode
 			If host.options.sortcode root.sortkids
 			codenode.Sync(root)
@@ -4175,7 +4126,7 @@ Type TOpenCode Extends TToolPanel
 			d.count0=cursorlen
 			d.pos=oldpos
 			d.count=oldlen
-			If cursorlen And oldlen							'block modified
+			If cursorlen And oldlen							'blocco modificato
 				d.del=cleansrc[oldpos..oldpos+oldlen]
 				d.add=src[oldpos..cursorpos+cursorlen]
 				d.pos1=oldpos
@@ -4183,14 +4134,14 @@ Type TOpenCode Extends TToolPanel
 				If cursorpos<=oldpos And cursorlen<=oldlen	'backspace
 					d.del=cleansrc[cursorpos..cursorpos+cleansrc.length-src.length]
 					d.pos1=cursorpos
-				Else										'insert
+				Else										'inserimento
 					d.del=cleansrc[oldpos..oldpos+oldlen]
 					d.add=src[oldpos..cursorpos+cursorlen]
 					d.pos1=oldpos
 				EndIf
 			EndIf
 		Else
-			If cursorpos>oldpos									'overwrite
+			If cursorpos>oldpos									'sovrascrittura
 				d=New TDiff
 				d.pos0=cursorpos
 				d.count0=cursorlen
@@ -4288,13 +4239,13 @@ Type TOpenCode Extends TToolPanel
 					Local style:TTextStyle = host.options.styles[i]
 					TextAreaSetHighlightStyle(textarea, i, style.flags, style.color.red, style.color.green, style.color.blue)
 				Next
-				' Operators are NOT bracket matches.  Keep the two styles independent.
+				' Gli Operatori NON sono corrispondenze di parentesi. Mantieni indipendenti i due stili.
 				Local opstyle:TTextStyle = host.options.styles[OPERATOR_STYLE]
 				If isbmx Then
-					' BlitzMax lexer operator/punctuation style.
+					' Stile operatore/punteggiatura del lexer BlitzMax.
 					TextAreaSetHighlightStyle(textarea, 6, opstyle.flags, opstyle.color.red, opstyle.color.green, opstyle.color.blue)
 				Else
-					' Scintilla C/C++ lexer operator style (SCE_C_OPERATOR = 10).
+					' Stile operatore del lexer C/C++ di Scintilla (SCE_C_OPERATOR = 10).
 					TextAreaSetHighlightStyle(textarea, 10, opstyle.flags, opstyle.color.red, opstyle.color.green, opstyle.color.blue)
 				EndIf
 			End If
@@ -4323,14 +4274,14 @@ Type TOpenCode Extends TToolPanel
 		SetCode(src)
 	End Method
 
-	Function IsntAlphaNumeric(c)		'lowercase test only
+	Function IsntAlphaNumeric(c)		'controllo solo in minuscolo
 		If c<48 Return True
 		If c>=58 And c<95 Return True
 		If c=96 Return True
 		If c>=123 Return True
 	End Function
 
-	Function IsntAlphaNumericOrQuote(c)		'lowercase test only
+	Function IsntAlphaNumericOrQuote(c)		'controllo solo in minuscolo
 		If c=34 Return False
 		If c<48 Return True
 		If c>=58 And c<95 Return True
@@ -4373,7 +4324,7 @@ Type TOpenCode Extends TToolPanel
 		Return src.length
 	End Function
 
-	Function FindToken(token$,src$,pos)	'lowercase src only!
+	Function FindToken(token$,src$,pos)	'src solo in minuscolo!
 		Local p,c
 		Local n=token.length
 		While pos>=0
@@ -4394,7 +4345,7 @@ Type TOpenCode Extends TToolPanel
 		Return src.length
 	End Function
 
-	Function FindEndToken(token$,src$,pos,returnlast=False)	'if true returns first character after endtoken
+	Function FindEndToken(token$,src$,pos,returnlast=False)	'se true restituisce il primo carattere dopo endtoken
 		Local	p,q,e$,n
 
 		p=pos
@@ -4438,7 +4389,7 @@ Type TOpenCode Extends TToolPanel
 		Return True
 	End Function
 
-' rem and endrem must be first nonwhitespace on line - following funcs are for lowercase src only
+' rem ed endrem devono essere i primi elementi non-spazio della riga - le funzioni seguenti sono solo per src in minuscolo
 
 	Function FindRem(src$,pos)
 		While pos<src.length
@@ -4467,10 +4418,10 @@ Type TOpenCode Extends TToolPanel
 		Return src.length
 	End Function
 
-	Function FindPrevRem(src$,pos)	'lowercase src only!
+	Function FindPrevRem(src$,pos)	'src solo in minuscolo!
 		Local	p,c
 		While pos>0
-			If pos>src.length Exit	'fixed endrem on lastline overrun
+			If pos>src.length Exit	'corretto lo sforamento di endrem sull ultima riga
 			p=src.FindLast("rem",src.length-pos)
 			If p=-1 Exit
 			If ( p>=src.length-3 Or isntalphanumeric(src[p+3]) ) And IsFirstCharOnLine(src,p) Return p
@@ -4511,7 +4462,7 @@ Type TOpenCode Extends TToolPanel
 	Method SetCode(src$,diff:TDiff=Null)
 		Local	same,i,p,startp,p1,q,r,a,t$,h$,lsrc$,r0,r1,cpos,autocap
 		Local	style:TTextStyle[5],s:TTextStyle
-' update dirty flag
+' aggiorna il flag dirty
 		CheckDirty src
 		same = Not ((diff) Or (src<>cleansrc))
 		If same And Not (diff Or HasTidyQueue()) Then Return
@@ -4523,15 +4474,16 @@ Type TOpenCode Extends TToolPanel
 				cleansrcl=src.ToLower()
 			EndIf
 			If isbmx And host.options.syntaxhighlight Then ApplyBmxOperatorHighlight()
+			If (isc Or iscpp) And host.options.syntaxhighlight Then ApplyCOperatorHighlight()
 			Return
 		EndIf
-' doit
+' esegui
 		If same Then lsrc = cleansrcl Else lsrc=src.ToLower()
 		cpos=TextAreaCursor(textarea,TEXTAREA_CHARS)
 		LockTextArea textarea
 		TextAreaEnableUndoRedo(textarea, False)
 		style=host.options.styles
-' calculate highlight region
+' calcola la regione di evidenziazione
 
 		If diff
 			p=diff.pos
@@ -4553,25 +4505,25 @@ Type TOpenCode Extends TToolPanel
 		If p1-p<q p1=p+q
 		If p1<p p1=p
 
-' round region to line breaks
+' estende la regione fino alle interruzioni di riga
 		'Print "p="+p+" p1="+p1
 		If p>src.length p=src.length
 		p=src.findlast(EOL,src.length-(p-1))+1
 		p1=src.find(EOL,p1)+1
 		If p1=0 p1=src.length
-' if endrem between p0,p1 and next rem after p1 move p1 forwards
+' se endrem e tra p0,p1 e il rem successivo e dopo p1, sposta p1 in avanti
 		r1=FindEndRem(lsrc,p)
 		If r1<p1 And wasremmed(r1+6,lsrc)
 			r0=FindRem(lsrc,r1+6)
 			If r0>p1 p1=r0
 		EndIf
-' if rem between p0,p1 and matching endrem after p1 move p1 forewards
+' se rem e tra p0,p1 e il relativo endrem e dopo p1, sposta p1 in avanti
 		r0=FindPrevRem(lsrc,p1)
 		If r0>=p And r0+3<>cpos	'defer fix
 			r1=FindEndRem(lsrc,r0,True)
 			If r1>p1 p1=r1
 		EndIf
-' if rem before p0 and matching endrem after p0 highlight to endrem and move p0 forwards
+' se rem e prima di p0 e il relativo endrem e dopo p0, evidenzia fino a endrem e sposta p0 in avanti
 		r0=FindPrevRem(lsrc,p)
 		If r0<>-1 And r0<p
 			r1=FindEndRem(lsrc,r0,True)
@@ -4586,13 +4538,13 @@ Type TOpenCode Extends TToolPanel
 				p=r1
 			EndIf
 		EndIf
-' if was remmed and now isn't move p1 down to nearest rem or endrem
+' se prima era in REM e ora non lo e, sposta p1 fino al rem o endrem piu vicino
 		If WasRemmed(p,lsrc)
 			r0=FindRem(lsrc,p)
 			r1=FindEndRem(lsrc,r0,True)
 			p1=Max(p1,Min(r0,r1))
 		EndIf
-' highlight code
+' evidenzia codice
 		ClearTidyQueue(p,p1)
 
 		s=style[NORMAL]
@@ -4602,7 +4554,7 @@ Type TOpenCode Extends TToolPanel
 		While p<p1
 			host.UpdateProgress(msgHighlightingStatus,(p*100)/p1)
 			a=src[p]
-' quoted strings
+' stringhe tra virgolette
 			If a=34
 				q=p1
 				r=src.Find(Chr(34),p+1)
@@ -4614,7 +4566,7 @@ Type TOpenCode Extends TToolPanel
 				p=q
 				Continue
 			EndIf
-' single line comments
+' commenti su singola riga
 			If a=39
 				q=p1
 				r=src.Find(EOL,p+1)
@@ -4624,12 +4576,12 @@ Type TOpenCode Extends TToolPanel
 				p=q
 				Continue
 			EndIf
-' tokens
+' token
 			If (a>=65 And a<91) Or (a>=97 And a<123) Or (a=95)
 				q=p+1
 				While q<p1
 					a=src[q]
-					If a<48 Exit	'changed to include dot (chr 47)
+					If a<48 Exit	'modificato per includere il punto (chr 47)
 					If a>=58 And a<65 Exit
 					If a>=91 And a<95 Exit
 					If a=96 Exit
@@ -4674,22 +4626,22 @@ Type TOpenCode Extends TToolPanel
 						Continue	'0-9
 					EndIf
 					If hexed
-						If (a>=$61 And a<$67) Then	'a-f (only test lower as 'a' var is from lsrc)
+						If (a>=$61 And a<$67) Then	'a-f (controlla solo il minuscolo poiche la variabile 'a' proviene da lsrc)
 							valid = True
 							Continue
 						EndIf
 					EndIf
 					If (a=$2E) Then
-						'Hex or Binary literals don't support decimal points
+						'I letterali esadecimali o binari non supportano punti decimali
 						If Not (hexed Or binaried) Then
 							dots:+1
-							'Fix for slicing '..' syntax
+							'Correzione per la sintassi di slicing '..'
 							If src[q-2] = $2E Then
 								dots:-2
 								q:-2
 								Exit
 							EndIf
-							'End Fix
+							'Fine correzione
 							Continue
 						EndIf
 					EndIf
@@ -4698,10 +4650,10 @@ Type TOpenCode Extends TToolPanel
 					Exit
 				Wend
 				If shouldHighlight And valid And dots < 2 Then style[NUMBER].format(textarea,p,(q-p))
-				'Fix for slicing '..' syntax
+				'Correzione per la sintassi di slicing '..'
 				If q<src.length And (src[q]=Asc(".")) Then q:+1
 				If q<src.length And (src[q]=Asc(".")) Then q:+1
-				'End Fix
+				'Fine correzione
 				p=q
 				Continue
 			EndIf
@@ -4716,7 +4668,7 @@ Type TOpenCode Extends TToolPanel
 '		CheckDirty src	simon was here
 	End Method
 
-	' Force a separate Operators colour for BlitzMax punctuation.
+	' Forza un colore Operatori separato per la punteggiatura BlitzMax.
 	Method ApplyBmxOperatorHighlight()
 		If Not isbmx Then Return
 		If Not host.options.syntaxhighlight Then Return
@@ -4730,8 +4682,8 @@ Type TOpenCode Extends TToolPanel
 		For Local p:Int = 0 Until src.length
 			Local ch:Int = src[p]
 
-			' At the beginning of every physical line, detect BlitzMax REM/ENDREM blocks.
-			' Operators inside those blocks must keep the Remarks colour.
+			' All inizio di ogni riga fisica, rileva i blocchi REM/ENDREM di BlitzMax.
+			' Gli Operatori dentro questi blocchi devono mantenere il colore dei Remarks.
 			If lineStart Then
 				Local q:Int = p
 				While q < src.length And (src[q]=32 Or src[q]=9)
@@ -4771,7 +4723,88 @@ Type TOpenCode Extends TToolPanel
 			If inString Then Continue
 
 			Select ch
-				Case 40,41,91,93,123,125,61,43,45,42,47,60,62,38,124,126,94,58
+				Case 40,41,123,125,61,43,45,42,47,60,62,38,124,126,94,58
+					op.format(textarea,p,1)
+			End Select
+		Next
+	End Method
+
+
+	' Forza il colore Operatori anche per la punteggiatura C/C++.
+	' Il lexer C di Scintilla non espone sempre la punteggiatura con la stessa
+	' mappatura di stile usata dal lexer BlitzMax, quindi la colora esplicitamente
+	' preservando stringhe e commenti.
+	Method ApplyCOperatorHighlight()
+		If Not (isc Or iscpp) Then Return
+		If Not host.options.syntaxhighlight Then Return
+		Local src:String = TextAreaText(textarea)
+		Local op:TTextStyle = host.options.styles[OPERATOR_STYLE]
+		Local inString:Int = False
+		Local inChar:Int = False
+		Local inLineComment:Int = False
+		Local inBlockComment:Int = False
+		Local escaped:Int = False
+
+		For Local p:Int = 0 Until src.length
+			Local ch:Int = src[p]
+			Local nx:Int = 0
+			If p + 1 < src.length Then nx = src[p + 1]
+
+			If inLineComment Then
+				If ch = 10 Or ch = 13 Then inLineComment = False
+				Continue
+			EndIf
+
+			If inBlockComment Then
+				If ch = 42 And nx = 47 Then
+					inBlockComment = False
+					p:+1
+				EndIf
+				Continue
+			EndIf
+
+			If inString Then
+				If escaped Then
+					escaped = False
+				ElseIf ch = 92 Then
+					escaped = True
+				ElseIf ch = 34 Then
+					inString = False
+				EndIf
+				Continue
+			EndIf
+
+			If inChar Then
+				If escaped Then
+					escaped = False
+				ElseIf ch = 92 Then
+					escaped = True
+				ElseIf ch = 39 Then
+					inChar = False
+				EndIf
+				Continue
+			EndIf
+
+			If ch = 47 And nx = 47 Then
+				inLineComment = True
+				p:+1
+				Continue
+			ElseIf ch = 47 And nx = 42 Then
+				inBlockComment = True
+				p:+1
+				Continue
+			ElseIf ch = 34 Then
+				inString = True
+				escaped = False
+				Continue
+			ElseIf ch = 39 Then
+				inChar = True
+				escaped = False
+				Continue
+			EndIf
+
+			Select ch
+				Case 40,41,123,125,61,43,45,42,47,60,62,38,124,126,94,58,33,37,63
 					op.format(textarea,p,1)
 			End Select
 		Next
@@ -4797,10 +4830,10 @@ Type TOpenCode Extends TToolPanel
 
 	Method IndentCode()
 		Local	a$
-' blockindent
+' indenta blocco
 		Local p0 = TextAreaCursor(textarea,TEXTAREA_LINES)
 		Local p1 = TextAreaSelLen(textarea,TEXTAREA_LINES)
-' v122: make sure the entire block is selected (start cursor pos may in the middle of the line)
+' v122: assicura che sia selezionato l intero blocco (la posizione iniziale del cursore puo trovarsi a meta riga)
 		SelectTextAreaText textarea , p0 , p1 , TEXTAREA_LINES
 		UpdateCursor
 		TextAreaBeginUndoAction textarea
@@ -4816,10 +4849,10 @@ Type TOpenCode Extends TToolPanel
 
 	Method OutdentCode()
 		Local	a$,modified
-' blockoutdent
+' riduci indentazione blocco
 		Local p0 = TextAreaCursor(textarea,TEXTAREA_LINES)
 		Local p1 = TextAreaSelLen(textarea,TEXTAREA_LINES)
-' v122: make sure the entire block is selected (start cursor pos may in the middle of the line)
+' v122: assicura che sia selezionato l intero blocco (la posizione iniziale del cursore puo trovarsi a meta riga)
 		SelectTextAreaText textarea , p0 , p1 , TEXTAREA_LINES
 		UpdateCursor
 		TextAreaBeginUndoAction textarea
@@ -4847,7 +4880,7 @@ Type TOpenCode Extends TToolPanel
 		Local key=event.data
 		Local mods=event.mods
 		Local this:TOpenCode=TOpenCode(context)
-		'ignore panel-tabbing
+		'ignora il passaggio tra pannelli con TAB
 		If id=EVENT_KEYCHAR And this And key=lastTabKey And mods=lastTabMod
 			this.host.SwitchPanel()
 			Return 0
@@ -4869,8 +4902,8 @@ Type TOpenCode Extends TToolPanel
 		EndIf
 
 		'
-		' the scintilla textarea uses KEYCHAR events to update its contents.
-		' so we need to also suppress those for our autoindent funcitonality.
+		' l area di testo Scintilla usa eventi KEYCHAR per aggiornare il contenuto.
+		' quindi dobbiamo sopprimere anche questi per la funzione di autoindentazione.
 		If id=EVENT_KEYCHAR And key=KEY_ENTER And this And this.host.options.autoindent And TextAreaHasCharEventSupressionFixup(this.textarea) Then
 			Return 0
 		End If
@@ -4914,9 +4947,9 @@ Type TOpenCode Extends TToolPanel
 			host.lockedpanel=Null
 		EndIf
 		host.RefreshPanel Self
-		'toolbar changes (lock icon)
+		'modifiche toolbar (icona lucchetto)
 		host.RefreshToolbar
-		'menu entry changes
+		'modifiche voce di menu
 		host.RefreshMenu
 	End Method
 
@@ -4944,11 +4977,11 @@ Type TOpenCode Extends TToolPanel
 		If s seek=s Else s=seek
 		Local p = TextAreaCursor(textarea,TEXTAREA_CHARS)
 		p:+TextAreaSelLen(textarea,TEXTAREA_CHARS)
-' case insensitive
+' senza distinzione maiuscole/minuscole
 		Local l$ = s.toLower()
 		p=cleansrcl.Find(l$,p)
 		If p=-1 p=cleansrcl.Find(l$)
-' case sensitive
+' con distinzione maiuscole/minuscole
 '		p=cleansrc.Find(s$,p+1)
 '		if p=-1 p=cleansrc.Find(s$)
 		If p=-1
@@ -5062,11 +5095,11 @@ Type TOpenCode Extends TToolPanel
 			If universal cmd :+ " -i"
 			If warnover cmd :+ " -w"
 			If gdbdebug cmd :+ " -gdb"
-			'UPX compression is only available for "makeapp"
+			'la compressione UPX e disponibile solo per "makeapp"
 			If (guiBuild Or consoleBuild) And useUPX cmd :+ " -upx"
 			If requireOverride cmd :+ " -override"
 			If gprof cmd :+ " -gprof"
-			'bmk requires "-override" to use "-overerr"
+			'bmk richiede "-override" per usare "-overerr"
 			If requireOverride And overrideError cmd :+ " -overerr"
 			If appstub And appstub <> "brl.appstub" cmd :+ " -b " + appstub
 			If guiBuild And hires cmd$:+" -hi"
@@ -5089,7 +5122,7 @@ Type TOpenCode Extends TToolPanel
 			If ishtml
 				host.helppanel.Go "file://"+path
 			Else
-'see what the system shell thinks of the file
+'verifica come la shell di sistema interpreta il file
 				Local cd$=CurrentDir()
 				ChangeDir ExtractDir(path)
 				cmd=StripDir(path)
@@ -5111,7 +5144,7 @@ Type TOpenCode Extends TToolPanel
 		If dirty SaveSource(file)
 		Return True
 	End Method
-' common command interface
+' interfaccia comune dei comandi
 
 	Method Invoke(command,argument:Object=Null)
 		Local	file$,ex$
@@ -5126,7 +5159,7 @@ Type TOpenCode Extends TToolPanel
 			Case TOOLCLOSE
 				If dirty 'Or host.IsTempPath(path)
 					Invoke(TOOLSHOW)
-					p=Proceed(LocalizeString("{{request_savechanges}}").Replace("%1",name))	'the current file?
+					p=Proceed(LocalizeString("{{request_savechanges}}").Replace("%1",name))	'il file corrente?
 					If p=-1 Return True
 					If p=1
 						If Not Save() Return True
@@ -5136,9 +5169,9 @@ Type TOpenCode Extends TToolPanel
 					codenode.Free()
 					codenode=Null
 				EndIf
-				'Added just in case MaxGUI driver doesn't handle properly.
+				'Aggiunto nel caso in cui il driver MaxGUI non lo gestisca correttamente.
 				SetGadgetFilter textarea,Null,Null
-				'Seb gone.
+				'Seb rimosso.
 				host.RemovePanel Self
 				FreeGadget(editmenu)
 			Case TOOLSAVE
@@ -5236,7 +5269,7 @@ Type TOpenCode Extends TToolPanel
 	End Function
 
 	Method MakePathTemp()
-' prepends "." to file name with code borrowed from SaveAs
+' antepone "." al nome del file usando codice derivato da SaveAs
 		Local file$=ExtractDir(path)+"/."+StripDir(path)
 		SaveSource(file$)
 '		Refresh
@@ -5252,10 +5285,10 @@ Type TOpenCode Extends TToolPanel
 			Select ExtractExt(path).ToLower()
 				Case "bmx"
 					lang = "blitzmax"
-					' Keep syntax highlighting independent from QuickHelp/documentation.
+					' Mantiene l evidenziazione della sintassi indipendente da QuickHelp/documentazione.
 					keywords[0] = KEYWORDS_BLITZMAX
 				Case "bmk"
-					' BlitzMax build scripts: use the BlitzMax keyword set.
+					' Script di build BlitzMax: usa l insieme di parole chiave BlitzMax.
 					lang = "blitzmax"
 					keywords[0] = KEYWORDS_BLITZMAX
 				Case "c"
@@ -5312,10 +5345,10 @@ Type TOpenCode Extends TToolPanel
 		SetGadgetFilter code.textarea,code.FilterKey,code
 		SetTextAreaText code.textarea,"~n"
 		SetGadgetLayout code.textarea,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED
-		' Determine the source language BEFORE RefreshStyle().
-		' RefreshStyle needs isbmx=True to assign SCE_B_OPERATOR (style 6)
-		' to the Operators colour. Previously this flag was set too late, so
-		' BlitzMax files incorrectly received the C/C++ operator style (10).
+		' Determina il linguaggio sorgente PRIMA di RefreshStyle().
+		' RefreshStyle richiede isbmx=True per assegnare SCE_B_OPERATOR (stile 6)
+		' al colore degli Operatori. In precedenza questo flag veniva impostato troppo tardi, quindi
+		' i file BlitzMax ricevevano erroneamente lo stile operatore C/C++ (10).
 		Local sourceExt:String = ExtractExt(path).ToLower()
 		If sourceExt="bmx" Or sourceExt="bmk" Then code.isbmx=True
 		If sourceExt="c" Then code.isc=True
@@ -5341,12 +5374,13 @@ Type TOpenCode Extends TToolPanel
 		If host.options.syntaxhighlight And TextAreaHasHighlighting(code.textarea) Then
 			TextAreaHighlight(code.textarea)
 			code.ApplyBmxOperatorHighlight()
+			code.ApplyCOperatorHighlight()
 		End If
 		Return code
 	End Function
 
-	' BlitzMax / BlitzMax NG language keywords used only by the editor lexer.
-	' This list is deliberately local: QuickHelp no longer controls syntax colouring.
+	' Parole chiave BlitzMax / BlitzMax NG usate solo dal lexer dell editor.
+	' Questa lista e volutamente locale: QuickHelp non controlla piu la colorazione della sintassi.
 	Const KEYWORDS_BLITZMAX:String = "abstract alias and array asc assert auto break case catch continue const defdata default delete each else elseif end endextern endfunction endif endmethod endselect endtype endwhile exit extern false field final finally float for forever function global if implements import incbin include inline int interface local long max method mod module new next not null object or private protected public ptr read restore repeat return select self short step strict string super then throw to true try type until var void wend while xor " + ..
 		"byte double uint ulong ushort size_t ssize_t byte_ptr short_ptr int_ptr long_ptr float_ptr double_ptr varptr chr len mid left right instr upper lower trim lset rset replace fromhex tohex binary min max abs sgn floor ceil sin cos tan asin acos atan atan2 sqr log exp pow rand rnd seedrnd millisecs currentdate currenttime appargs getenv setenv system delay debuglog print input stop end"
 
@@ -5434,27 +5468,27 @@ Type TCodePlay
 	Field Mode
 	Field debugcode:TOpenCode
 
-	Field quickenable:TGadget,quickenabled	'menu,state
-	Field debugenable:TGadget,debugenabled	'menu,state
+	Field quickenable:TGadget,quickenabled	'menu,stato
+	Field debugenable:TGadget,debugenabled	'menu,stato
 	Field threadedenable:TGadget,threadedenabled
-	Field consoleenable:TGadget,consoleenabled		'menu,state
-	Field guienable:TGadget,guienabled		'menu,state
-	Field makelibenable:TGadget,makelibenabled		'menu,state
-	Field verboseenable:TGadget,verboseenabled		'menu,state
-	Field quickscanenable:TGadget,quickscanenabled		'menu,state
-	Field universalenable:TGadget,universalenabled		'menu,state
-	Field warnoverenable:TGadget,warnoverenabled		'menu,state
-	Field gdbdebugenable:TGadget,gdbdebugenabled		'menu,state
-	Field requireOverrideEnable:TGadget,requireOverrideEnabled		'menu,state
-	Field overrideErrorsEnable:TGadget,overrideErrorsEnabled		'menu,state
-	Field gprofenable:TGadget,gprofenabled		'menu,state
-	Field hiresenable:TGadget,hiresenabled		'menu,state
+	Field consoleenable:TGadget,consoleenabled		'menu,stato
+	Field guienable:TGadget,guienabled		'menu,stato
+	Field makelibenable:TGadget,makelibenabled		'menu,stato
+	Field verboseenable:TGadget,verboseenabled		'menu,stato
+	Field quickscanenable:TGadget,quickscanenabled		'menu,stato
+	Field universalenable:TGadget,universalenabled		'menu,stato
+	Field warnoverenable:TGadget,warnoverenabled		'menu,stato
+	Field gdbdebugenable:TGadget,gdbdebugenabled		'menu,stato
+	Field requireOverrideEnable:TGadget,requireOverrideEnabled		'menu,stato
+	Field overrideErrorsEnable:TGadget,overrideErrorsEnabled		'menu,stato
+	Field gprofenable:TGadget,gprofenabled		'menu,stato
+	Field hiresenable:TGadget,hiresenabled		'menu,stato
 	Field lockBuildMenuItem:TGadget
 	Field unlockBuildMenuItem:TGadget
 	Field gotoBuildMenuItem:TGadget
 
 	Field miscoptionsmenu:TGadget
-	Field upxEnable:TGadget, upxEnabled:Int 'menu,state
+	Field upxEnable:TGadget, upxEnabled:Int 'menu,stato
 
 	Field quickhelp:TQuickHelp
 	Field running
@@ -5546,7 +5580,7 @@ Type TCodePlay
 		progress=0
 	End Method
 
-	Method UpdateProgress(message$,value=0)		'returns false if cancelled
+	Method UpdateProgress(message$,value=0)		'restituisce false se annullato
 '		Return progress.Update(message,value)
 		If progress
 			If progress/5<>value/5
@@ -5577,7 +5611,7 @@ Type TCodePlay
 	Method ReadConfig()
 		Local	stream:TStream
 		Local	f$,p,a$,b$
-' defaults
+' valori predefiniti
 		Local wh=GadgetHeight(Desktop())-80'32
 		Local ww=wh
 		Local wx=(GadgetWidth(Desktop())-ww)/2
@@ -5585,7 +5619,7 @@ Type TCodePlay
 		winsize.set( wx,wy,ww,wh )
 		quickenabled=False
 		debugenabled=True
-		threadedenabled=False
+		threadedenabled=True
 		consoleenabled=False
 		guienabled=True
 		makelibenabled=False
@@ -5606,7 +5640,7 @@ Type TCodePlay
 
 		splitpos=200;splitorientation = SPLIT_VERTICAL
 		selectedappstub="brl.appstub"
-' read ini
+' legge ini
 		stream=ReadFile(bmxpath+"/cfg/ide.ini")
 		If Not stream
 			AddDefaultProj "Samples|samples"
@@ -5715,9 +5749,9 @@ Type TCodePlay
 
 		Local	stream:TStream = WriteFile(bmxpath+"/cfg/ide.ini")
 		If Not stream Return
-' options
+' opzioni
 		options.write(stream)
-' defaults
+' valori predefiniti
 		stream.WriteLine "[Defaults]"
 		stream.WriteLine "ide_version="+IDE_VERSION$
 		stream.WriteLine "prg_quick="+quickenabled
@@ -5758,7 +5792,7 @@ Type TCodePlay
 		Local n:Int
 		For f$=EachIn recentfiles
 			stream.WriteLine "file_recent="+f$
-			' only last 20
+			' solo gli ultimi 20
 			If n=20 Exit
 			n:+1
 		Next
@@ -5776,7 +5810,7 @@ Type TCodePlay
 		stream.close
 	End Method
 
-	Method CloseAll(dontask,inccurrent=True)	'returns true if successful
+	Method CloseAll(dontask,inccurrent=True)	'restituisce true se riuscito
 		Local	count, cancel
 		For Local panel:TToolPanel = EachIn panels
 			If TOpenCode(panel) And (inccurrent Or currentpanel <> panel) count:+1
@@ -5800,7 +5834,7 @@ Type TCodePlay
 	Method DebugExit()
 		If debugcode
 			debugtree.cancontinue = False
-			debugcode.Edit		'restore cursor etc.
+			debugcode.Edit		'ripristina cursore ecc.
 			debugcode=Null
 		EndIf
 		SetMode EDITMODE
@@ -5815,7 +5849,7 @@ Type TCodePlay
 			Notify(LocalizeString("{{loaderror_failed}}").Replace("%1",path), True)
 			Return
 		EndIf
-		If debugcode And debugcode<>code Then debugcode.Edit()	'restore cursor etc.
+		If debugcode And debugcode<>code Then debugcode.Edit()	'ripristina cursore ecc.
 		debugcode=code
 		debugcode.debug(line,column)
 		ActivateWindow window
@@ -5839,7 +5873,7 @@ Type TCodePlay
 	Method RefreshMenu()
 		TOpenCode.RefreshHighlightingMsg()
 
-		'disable menu entry to unlock build lock if there is none
+		'disabilita la voce di menu per sbloccare il build lock se non presente
 		If unlockBuildMenuItem And gotoBuildMenuItem
 			If Not lockedPanel
 				DisableMenu(unlockBuildMenuItem)
@@ -5854,7 +5888,7 @@ Type TCodePlay
 	EndMethod
 
 	Method RefreshToolbar()
-		' NGide 1.05: legacy toolbar removed. Kept as no-op for existing refresh calls.
+		' NGide 1.05: toolbar precedente rimossa. Mantenuta come no-op per le chiamate di refresh esistenti.
 	End Method
 
 	Method IsSourceOpen(path$)
@@ -5871,7 +5905,7 @@ Type TCodePlay
 			path$=RequestFile(LocalizeString("{{request_openfile}}"),FileTypeFilters )
 			If path$="" Return
 		EndIf
-' check if already open
+' controlla se e gia aperto
 		p$=FullPath(path).ToLower()
 		For Local panel:TToolPanel = EachIn panels
 			If panel.path.ToLower()=p
@@ -5879,7 +5913,7 @@ Type TCodePlay
 				Return TOpenCode(panel)
 			EndIf
 		Next
-' open based on extension
+' apre in base all estensione
 '		Select ExtractExt(Upper(path$))
 '		Case "BMX","TXT","BB","CPP","C","S","I","H","HTML","CSS","BAT","FS","VS","README",""
 			OpenProgress LocalizeString("{{msg_loading}}").Replace("%1",StripDir(path))
@@ -5938,7 +5972,7 @@ Type TCodePlay
 			End If
 			n:+1
 		Next
-		' didn't match any app stubs. choose default (brl.appstub)
+		' nessun app stub corrispondente. sceglie quello predefinito (brl.appstub)
 		If Not checked Then
 			selectedappstub = options.appstubs[0]
 			CheckMenu appstubmenus[0]
@@ -5948,7 +5982,7 @@ Type TCodePlay
 	Method UpdateRestartState()
 ?win32x64
 		If options.restartaftershutdown Then
-			' set to restart if the system restarted
+			' imposta il riavvio se il sistema e stato riavviato
 			RegisterApplicationRestart(Null, RESTART_NO_CRASH | RESTART_NO_HANG)
 		Else
 			UnregisterApplicationRestart()
@@ -5972,7 +6006,7 @@ Type TCodePlay
 		If gdbdebugenabled cmd:+"-gdb "
 		If requireOverrideEnabled
 			cmd:+"-override "
-			'bmk requires "-override" to use "-overerr"
+			'bmk richiede "-override" per usare "-overerr"
 			If overrideErrorsEnabled
 				cmd :+ " -overerr"
 			EndIf
@@ -6018,7 +6052,7 @@ Type TCodePlay
 	Method ParseError(err$)
 		Local		mess$,file$,p,q
 		Local		line,column
-' bcc error
+' errore bcc
 		If err$[..13]="Compile Error"
 			err=err[14..]
 			p=err.find(EOL$)
@@ -6042,11 +6076,11 @@ Type TCodePlay
 			SetStatus mess
 			Return
 		EndIf
-' gcc error
+' errore gcc
 		err=err.Replace(EOL+"   "," ")
 		While err
 			p=err.find(EOL)
-			If p=-1 p:+err.length	'equiv. to p=err.length-1 ;-)
+			If p=-1 p:+err.length	'equivale a p=err.length-1 ;-)
 			mess=err[..p]
 			err=err[p+1..]
 			p=0
@@ -6093,9 +6127,9 @@ Type TCodePlay
 		Local p:TToolPanel[]
 		Local index
 		eventhandlers.remove tabpanel
-' unset debugcode
+' azzera debugcode
 		If debugcode=tabpanel debugcode=Null
-' activate next panel
+' attiva il pannello successivo
 		If tabpanel=activepanel activepanel=helppanel
 		If tabpanel=lockedpanel lockedpanel=Null
 		If tabpanel=currentpanel
@@ -6103,14 +6137,14 @@ Type TCodePlay
 			If index>=panels.length index=panels.length-2
 			SelectPanel panels[index]
 		EndIf
-' remove from array
+' rimuove dall array
 		p=panels
 		panels=panels[..panels.length-1]
 		For index=tabpanel.index To panels.length-1
 			panels[index]=p[index+1]
 			panels[index].index=index
 		Next
-' remove gadget	- simon come here,  placing before remove needs fix in fltk
+' rimuove gadget	- simon come here,  placing before remove needs fix in fltk
 		FreeGadget tabpanel.panel
 		RemoveGadgetItem tabbar,tabpanel.index
 		tabpanel.panel=Null
@@ -6149,7 +6183,7 @@ Type TCodePlay
 	Method SwitchPanel()
 		If Not currentpanel Then Return
 
-		'if there was no panel selected before, use the previous one 
+		'se prima non era selezionato alcun pannello, usa quello precedente 
 		If Not lastPanel Or lastPanel = currentPanel
 			Local prevIndex:Int = currentpanel.index - 1
 			If prevIndex < 0 Then prevIndex = panels.length-1
@@ -6164,7 +6198,7 @@ Type TCodePlay
 
 		currentpanel=panel
 		If curr And curr<>currentpanel
-			'backup panel for panel-switching
+			'pannello di backup per il cambio pannello
 			If Not lastPanel Or lastPanel <> currentpanel
 				lastPanel = currentpanel
 			EndIf
@@ -6177,7 +6211,7 @@ Type TCodePlay
 		currentpanel.Invoke TOOLSHOW
 	End Method
 
-	Method RefreshPanel(panel:TToolPanel)	'call after a name change
+	Method RefreshPanel(panel:TToolPanel)	'chiama dopo una modifica del nome
 		ModifyGadgetItem( tabbar,panel.index,panel.name,GADGETITEM_LOCALIZED )
 	End Method
 
@@ -6258,6 +6292,9 @@ Type TCodePlay
 		splash=CreateWindow("NGide "+IDE_VERSION,ScaledSize(200),ScaledSize(200),ScaledSize(400),ScaledSize(160),Null,WINDOW_CLIENTCOORDS|WINDOW_HIDDEN|WINDOW_CENTER)
 			Local panel:TGadget = CreatePanel(0,0,ClientWidth(splash),ClientHeight(splash),splash,0)
 			SetPanelColor panel,255,255,255;SetPanelPixmap panel, LoadPixmapPNG("incbin::splash.png"), PANELPIXMAP_FIT2
+			' Versione NGide visualizzata in alto a destra nella schermata di caricamento.
+			Local splashVersion:TGadget = CreateLabel("v1.18",ClientWidth(panel)-ScaledSize(82),ScaledSize(8),ScaledSize(72),ScaledSize(22),panel,LABEL_RIGHT)
+			SetGadgetColor splashVersion,255,255,255,False
 			' Barra di caricamento personalizzata NGide: sfondo scuro + riempimento azzurro.
 			' Non usa CreateProgBar, quindi il colore non viene imposto dal tema di Windows.
 			Local progressW:Int = ClientWidth(panel)-ScaledSize(4)
@@ -6287,7 +6324,7 @@ Type TCodePlay
 		ReadConfig()
 
 
-		' NGide 1.05: legacy MaxIDE toolbar completely removed.
+		' NGide 1.05: toolbar precedente di MaxIDE completamente rimossa.
 
 		If OutsideDesktop(winsize)
 			winsize.set(20,20,760,540)
@@ -6347,7 +6384,7 @@ Type TCodePlay
 
 		RefreshAll
 
-		SetGadgetShape progress,0,0,Max(1,Int(progressW*(0.4))),progressH;PollSystem 'allow repaint
+		SetGadgetShape progress,0,0,Max(1,Int(progressW*(0.4))),progressH;PollSystem 'consente il ridisegno
 
 		Local mkdocs
 		If FileType( bmxpath+"/docs/html/User Guide/index.html" )<>FILETYPE_FILE
@@ -6360,7 +6397,7 @@ Type TCodePlay
 		' L'Help resta disponibile normalmente dai relativi comandi del menu.
 		SetGadgetShape progress,0,0,Max(1,Int(progressW*(0.5))),progressH;PollSystem
 
-' scan projects in projlist
+' scansiona i progetti in projlist
 		For Local pdata:TList = EachIn projlist
 			projects.AddProject pdata
 		Next
@@ -6370,7 +6407,7 @@ Type TCodePlay
 		Local tmpProgValue# = 0.6
 		Local tmpProgStep#
 
-'open files from .ini restorelist
+'apre i file dalla restorelist del .ini
 		If options.restoreopenfiles
 			Local activePanel:TToolPanel
 			' NGide: all'avvio ripristina al massimo gli ultimi 5 sorgenti.
@@ -6391,13 +6428,20 @@ Type TCodePlay
 				If parts.length > 1 Then fileActive = Int(parts[1])
 				If parts.length > 2 Then fileCursorPos = Int(parts[2])
 
+				' Durante il ripristino iniziale carica un sorgente alla volta.
+				' PollSystem prima e dopo OpenSource lascia completare a MaxGUI
+				' la creazione/aggiornamento dei gadget del sorgente precedente.
+				PollSystem
+				Delay 120
 				open=OpenSource(fileURI)
+				PollSystem
 				If open
 					If fileActive Then activePanel = open
 
-					'set to stored cursor position
+					'imposta la posizione del cursore memorizzata
 					open.cursorPos = fileCursorPos
 					SelectTextAreaText( open.textarea, open.cursorpos, 0, TEXTAREA_CHARS )
+					PollSystem
 				EndIf
 				If open And fileURI = openlock
 					open.SetLocked(True)
@@ -6405,6 +6449,7 @@ Type TCodePlay
 
 				tmpProgValue :+ tmpProgStep
 				SetGadgetShape progress,0,0,Max(1,Int(progressW*(tmpProgValue))),progressH
+				PollSystem
 			Next
 
 			If activePanel Then SelectPanel( activePanel )
@@ -6414,7 +6459,7 @@ Type TCodePlay
 		If AppArgs.length > 1 Then tmpProgStep = (0.1/(AppArgs.length-1)) Else tmpProgValue = 1.0
 		SetGadgetShape progress,0,0,Max(1,Int(progressW*(tmpProgValue))),progressH;PollSystem
 
-' open files specified in command line
+' apre i file specificati nella riga di comando
 		For Local i:Int = 1 Until AppArgs.length
 			open=OpenSource(AppArgs[i])
 			tmpProgValue:+tmpProgStep;SetGadgetShape progress,0,0,Max(1,Int(progressW*(tmpProgValue))),progressH;PollSystem
@@ -6442,7 +6487,7 @@ Type TCodePlay
 
 		CreateTimer(TIMER_FREQUENCY)
 
-'build docs if not there
+'genera la documentazione se assente
 		If mkdocs
 			If Confirm( LocalizeString("{{loaderror_docsnotfound}}") ) And CloseAll( False ) DocMods
 		EndIf
@@ -6543,10 +6588,7 @@ Type TCodePlay
 		buildoptions=CreateMenu("{{menu_program_buildoptions}}",0,program)
 		quickenable=CreateMenu("{{menu_program_buildoptions_quick}}",MENUQUICKENABLED,buildoptions)
 		debugenable=CreateMenu("{{menu_program_buildoptions_debug}}",MENUDEBUGENABLED,buildoptions)
-		'If (FileType( BlitzMaxPath()+"/mod/brl.mod/blitz.mod/blitz_gc_ms.c" )=FILETYPE_FILE) ..
-		'	Or (FileType( BlitzMaxpath()+"/mod/brl.mod/blitz.mod/bdwgc" )=FILETYPE_DIR)
-		'		threadedenable=CreateMenu("{{menu_program_buildoptions_threaded}}",MENUTHREADEDENABLED,buildoptions)
-		'EndIf
+		threadedenable=CreateMenu("Threaded Build",MENUTHREADEDENABLED,buildoptions)
 
 		appoptions=CreateMenu("{{menu_program_appoptions}}",0,program)
 		consoleenable=CreateMenu("{{menu_program_buildoptions_consoleapp}}",MENUCONSOLEENABLED,appoptions)
@@ -6559,36 +6601,15 @@ Type TCodePlay
 		overrideErrorsEnable=CreateMenu("{{menu_program_buildoptions_overrideerrors}}",MENUOVERRIDEERRORSENABLED,buildoptions)
 		hiresEnable=CreateMenu("{{menu_program_buildoptions_hires}}",MENUHIRESENABLED,buildoptions)
 
-		platform=CreateMenu("{{menu_program_platform}}",0,program)
-		win32enable=CreateMenu("{{menu_program_platform_win32}}",MENUWIN32ENABLED,platform)
-		raspberrypienable=CreateMenu("{{menu_program_platform_raspberrypi}}",MENURASPBERRYPIENABLED,platform)
 ?Not raspberrypi
-		androidenable=CreateMenu("{{menu_program_platform_android}}",MENUANDROIDENABLED,platform)
 ?
-		nxenable=CreateMenu("{{menu_program_platform_nx}}",MENUNXENABLED,platform)
-		emscriptenenable=CreateMenu("{{menu_program_platform_emscripten}}",MENUEMSCRIPTENENABLED,platform)
 
-		'ARCHITECTURE MENU
+		'MENU ARCHITETTURA
 		architecture=CreateMenu("{{menu_program_arch}}",0,program)
 		x86enable=CreateMenu("{{menu_program_arch_x86}}",MENUX86ENABLED,architecture)
 		x64enable=CreateMenu("{{menu_program_arch_x64}}",MENUX64ENABLED,architecture)
-		ppcenable=CreateMenu("{{menu_program_arch_ppc}}",MENUPPCENABLED,architecture)
-		armenable=CreateMenu("{{menu_program_arch_arm}}",MENUARMENABLED,architecture)
-		armeabiv5enable=CreateMenu("{{menu_program_arch_armeabiv5}}",MENUARMEABIV5ENABLED,architecture)
-		armeabiv7aenable=CreateMenu("{{menu_program_arch_armeabiv7a}}",MENUARMEABIV7AENABLED,architecture)
-		arm64v8aenable=CreateMenu("{{menu_program_arch_arm64v8a}}",MENUARM64V8AENABLED,architecture)
-		jsenable=CreateMenu("{{menu_program_arch_js}}",MENUJSENABLED,architecture)
-		armv7enable=CreateMenu("{{menu_program_arch_armv7}}",MENUARMV7ENABLED,architecture)
-		arm64enable=CreateMenu("{{menu_program_arch_arm64}}",MENUARM64ENABLED,architecture)
 		
-		'MISC OPTIONS MENU
-		miscoptionsmenu = CreateMenu("{{menu_program_miscoptions}}",0,program)
-		upxEnable = CreateMenu("{{menu_program_miscoptions_upx}}",MENUUPXENABLED,miscoptionsmenu)
-
-		'APP STUB MENU
-		appstubmenu=CreateMenu("{{menu_program_appstub}}",0,program)
-
-		'DEVELOPER MENU
+		'MENU SVILUPPATORE
 		devoptions=CreateMenu("{{menu_program_buildoptions_dev}}",0,program)
 		verboseenable=CreateMenu("{{menu_program_buildoptions_verbose}}",MENUVERBOSEENABLED,devoptions)
 		gdbdebugenable=CreateMenu("{{menu_program_buildoptions_gdbdebug}}",MENUGDBDEBUGENABLED,devoptions)
@@ -6613,7 +6634,7 @@ Type TCodePlay
 		If guienabled CheckMenu guienable
 		If makelibenabled CheckMenu makelibenable
 		If upxEnabled CheckMenu upxEnable
-		'disable for sharedlibs
+		'disabilita per le librerie condivise
 		If makelibenabled DisableMenu upxEnable
 
 		If verboseenabled CheckMenu verboseenable
@@ -6625,8 +6646,8 @@ Type TCodePlay
 		If overrideErrorsEnabled CheckMenu overrideErrorsEnable
 		If gprofenabled CheckMenu gprofenable
 		If hiresenabled CheckMenu hiresenable
-		'need to do this below "CheckMenu" as it automatically enables
-		'the menu (again)
+		'deve essere fatto sotto "CheckMenu" poiche abilita automaticamente
+		'il menu (di nuovo)
 		If Not requireOverrideEnabled DisableMenu overrideErrorsEnable
 		If Not lockedPanel 
 			DisableMenu unlockBuildMenuItem
@@ -6641,18 +6662,18 @@ Type TCodePlay
 			End If
 		Next
 
+		' Il menu Platform e stato rimosso: NGide usa sempre Win32.
+		' Non chiamare UpdatePlatformMenus(), perche i relativi gadget menu
+		' (win32enable, raspberrypienable, ecc.) non vengono piu creati.
 		For Local i:Int = 0 Until platformenabled.length
-			If platformenabled[i] Then
-				UpdatePlatformMenus(i + PLATFORMOFFSET)
-				If defaultArch < 0 Then
-					DefaultArchitectureMenuForPlatform(i + PLATFORMOFFSET)
-				Else
-					UpdateArchitectureMenus(defaultArch + ARCHITECTUREOFFSET)
-				End If
-				Exit
-			End If
+			platformenabled[i] = False
 		Next
-		'UpdateArchitectureMenus()
+		platformenabled[MENUWIN32ENABLED - PLATFORMOFFSET] = True
+		If defaultArch < 0 Then
+			DefaultArchitectureMenuForPlatform(MENUWIN32ENABLED)
+		Else
+			UpdateArchitectureMenus(defaultArch + ARCHITECTUREOFFSET)
+		End If
 
 		Local mingw:String = MinGWPath()
 		If Not mingw
@@ -6713,14 +6734,14 @@ Type TCodePlay
 	End Method
 
 	Method RefreshAll()
-' legacy toolbar removed in NGide 1.05
-' refresh panels
+' toolbar precedente rimossa in NGide 1.05
+' refresh pannelli
 		For Local panel:TToolPanel = EachIn panels
 			panel.invoke TOOLREFRESH
 		Next
-' refresh navbar
+' aggiorna barra di navigazione
 		navbar.invoke TOOLREFRESH
-' refresh appstub menus
+' aggiorna menu appstub
 		RefreshAppStubs
 	End Method
 
@@ -6894,7 +6915,7 @@ Type TCodePlay
 					makelibenabled=False
 					UncheckMenu makelibenable
 
-					'only enable if the UPX binary is present
+					'abilita solo se il binario UPX e presente
 					If CanRunUPX() Then EnableMenu(upxEnable)
 				EndIf
 				UpdateWindowMenu window
@@ -6909,7 +6930,7 @@ Type TCodePlay
 					makelibenabled=False
 					UncheckMenu makelibenable
 					
-					'only enable if the UPX binary is present
+					'abilita solo se il binario UPX e presente
 					If CanRunUPX() Then EnableMenu(upxEnable)
 				EndIf
 				UpdateWindowMenu window
@@ -6924,9 +6945,9 @@ Type TCodePlay
 					guienabled=False
 					UncheckMenu guienable
 					
-					'upx is only available for "makeapp" (console/GUI) 
-					'do not set the flag to false to avoid having
-					'to reconfigure it after switching to console/GUI
+					'UPX e disponibile solo per "makeapp" (console/GUI) 
+					'non impostare il flag su false per evitare di doverlo
+					'riconfigurare dopo il passaggio a console/GUI
 					'upxEnabled=False
 					DisableMenu upxEnable
 				EndIf
@@ -6976,9 +6997,9 @@ Type TCodePlay
 				If requireOverrideEnabled
 					requireOverrideEnabled=False
 					UncheckMenu requireOverrideEnable
-					'disable menu entry as it requires "require override"
-					'this keeps "checked" information intact in case of
-					'a settings reactivation
+					'disabilita la voce di menu poiche richiede "require override"
+					'questo mantiene intatta l informazione "checked" in caso di
+					'a impostazioni reactivation
 					If overrideErrorsEnable Then DisableMenu overrideErrorsEnable
 				Else
 					requireOverrideEnabled=True
