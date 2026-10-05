@@ -34,6 +34,7 @@ Import MaxGUI.ProxyGadgets
 Import brl.eventqueue
 Import brl.filesystem
 Import brl.system
+Import "-lshell32"
 Import pub.freeprocess
 Import brl.pngloader
 Import brl.timer
@@ -43,6 +44,7 @@ Import brl.timerdefault
 Import brl.maxutil
 Import brl.stringbuilder
 Import "file64.o"
+Import "ngide_runadmin.c"
 Incbin "splash.png"
 Incbin "default.language.ini"
 
@@ -51,13 +53,14 @@ Const DEFAULT_LANGUAGEPATH$ = "incbin::default.language.ini"
 Incbin "window_icon.png"
 
 Const IDE_NAME$="NGide"
-Const IDE_VERSION$="1.18 [2027]"
+Const IDE_VERSION$="1.21 [2027]"
 Const TIMER_FREQUENCY=15
 
 AppTitle = IDE_NAME + " " + IDE_VERSION
 
 Extern
 	Global _bbusew	'flag 'NT' segreto
+	Function NGideRunAsAdmin:Long(file$z, parameters$z, directory$z) = "ngide_run_as_admin"
 End Extern
 
 If Not _bbusew
@@ -183,6 +186,8 @@ Const MENUMINI_SAVE=180
 Const MENUMINI_RUN=181
 Const MENUMINI_PANEL=182
 Const MENUMINI_LINES=183
+Const MENUMINI_RUNADMIN=184
+Const MENURUNADMINPOST=185
 Const MENURECENT=256
 
 
@@ -316,6 +321,8 @@ Const TOOLFINDNEXT=17
 Const TOOLREPLACE=18
 Const TOOLBUILD=19
 Const TOOLRUN=20
+Const TOOLRUNADMIN=33
+Const TOOLLAUNCHADMIN=34
 Const TOOLLOCK=21
 Const TOOLUNLOCK=22
 Const TOOLSELECT=23
@@ -5162,7 +5169,7 @@ Type TOpenCode Extends TToolPanel
 		Return True
 	End Method
 
-	Method BuildSource(quick,debug,threaded,consoleBuild,guiBuild,makelibBuild,run, verbose, quickscan, universal, warnover, gdbdebug, requireOverride, overrideError, useUPX:Int, gprof:Int, hires:Int, platform:String = Null, architecture:String = Null, appstub:String = Null)
+	Method BuildSource(quick,debug,threaded,consoleBuild,guiBuild,makelibBuild,run, verbose, quickscan, universal, warnover, gdbdebug, requireOverride, overrideError, useUPX:Int, gprof:Int, hires:Int, platform:String = Null, architecture:String = Null, appstub:String = Null, runAdmin:Int = False)
 		Local cmd$,out$,arg$
 		If isbmx Or isc Or iscpp
 			cmd$=quote(host.bmkpath)
@@ -5171,7 +5178,7 @@ Type TOpenCode Extends TToolPanel
 			Else
 				cmd:+" makelib"
 			End If
-			If run cmd$:+" -x"
+			If run And Not runAdmin cmd$:+" -x"
 			If debug cmd$:+" -d" Else cmd$:+" -r"	'-v
 			If threaded cmd$:+" -h"
 			If guiBuild cmd$:+" -t gui"
@@ -5203,7 +5210,11 @@ Type TOpenCode Extends TToolPanel
 				arg$=host.GetCommandLine()
 				If arg cmd$:+" "+arg
 			EndIf
-			host.execute cmd,"Building "+StripExt(StripDir(path))	',exe$
+			If runAdmin
+				host.execute cmd,"Building "+StripExt(StripDir(path)),String(MENURUNADMINPOST)
+			Else
+				host.execute cmd,"Building "+StripExt(StripDir(path))	',exe$
+			EndIf
 		Else
 			If ishtml
 				host.helppanel.Go "file://"+path
@@ -5217,6 +5228,25 @@ Type TOpenCode Extends TToolPanel
 			EndIf
 		EndIf
 '		print cmd
+	End Method
+
+	Method RunBuiltAsAdmin()
+		Local exe:String = StripExt(host.FullPath(path))
+		If host.debugenabled Then exe :+ ".debug"
+
+		' Su Windows bmk puo produrre il nome con estensione .exe.
+		If FileType(exe + ".exe") = FILETYPE_FILE Then exe :+ ".exe"
+
+		If FileType(exe) <> FILETYPE_FILE Then
+			Notify "RUN AS ADMIN: eseguibile non trovato.~n~n" + exe
+			Return
+		EndIf
+
+		Local args:String = host.GetCommandLine()
+		Local result:Long = NGideRunAsAdmin(exe, args, ExtractDir(exe))
+		If result <= 32 Then
+			Notify "Impossibile avviare l'applicazione come amministratore."
+		EndIf
 	End Method
 
 	Method Save()
@@ -5300,6 +5330,10 @@ Type TOpenCode Extends TToolPanel
 				BuildSource host.quickenabled,host.debugenabled,host.threadedenabled,host.consoleenabled, host.guienabled, host.makelibenabled,False, host.verboseenabled, host.quickscanenabled, host.universalenabled, host.warnoverenabled, host.gdbdebugenabled, host.requireOverrideEnabled, host.overrideErrorsEnabled, host.upxEnabled, host.gprofenabled, host.hiresenabled, host.GetPlatform(), host.GetArchitecture(), host.selectedappstub
 			Case TOOLRUN
 				BuildSource host.quickenabled,host.debugenabled,host.threadedenabled,host.consoleenabled, host.guienabled, host.makelibenabled,True, host.verboseenabled, host.quickscanenabled, host.universalenabled, host.warnoverenabled, host.gdbdebugenabled, host.requireOverrideEnabled, host.overrideErrorsEnabled, host.upxEnabled, host.gprofenabled, host.hiresenabled, host.GetPlatform(), host.GetArchitecture(), host.selectedappstub
+			Case TOOLRUNADMIN
+				BuildSource host.quickenabled,host.debugenabled,host.threadedenabled,host.consoleenabled, host.guienabled, host.makelibenabled,True, host.verboseenabled, host.quickscanenabled, host.universalenabled, host.warnoverenabled, host.gdbdebugenabled, host.requireOverrideEnabled, host.overrideErrorsEnabled, host.upxEnabled, host.gprofenabled, host.hiresenabled, host.GetPlatform(), host.GetArchitecture(), host.selectedappstub, True
+			Case TOOLLAUNCHADMIN
+				RunBuiltAsAdmin()
 			Case TOOLLOCK
 				SetLocked True
 			Case TOOLUNLOCK
@@ -6377,7 +6411,7 @@ Type TCodePlay
 			Local panel:TGadget = CreatePanel(0,0,ClientWidth(splash),ClientHeight(splash),splash,0)
 			SetPanelColor panel,255,255,255;SetPanelPixmap panel, LoadPixmapPNG("incbin::splash.png"), PANELPIXMAP_FIT2
 			' Versione NGide visualizzata in alto a destra nella schermata di caricamento.
-			Local splashVersion:TGadget = CreateLabel("v1.18",ClientWidth(panel)-ScaledSize(82),ScaledSize(8),ScaledSize(72),ScaledSize(22),panel,LABEL_RIGHT)
+			Local splashVersion:TGadget = CreateLabel("v1.21",ClientWidth(panel)-ScaledSize(82),ScaledSize(8),ScaledSize(72),ScaledSize(22),panel,LABEL_RIGHT)
 			SetGadgetColor splashVersion,255,255,255,False
 			' Barra di caricamento personalizzata NGide: sfondo scuro + riempimento azzurro.
 			' Non usa CreateProgBar, quindi il colore non viene imposto dal tema di Windows.
@@ -6711,6 +6745,9 @@ Type TCodePlay
 		CreateMenu "[↪ PANEL]",MENUMINI_PANEL,menu
 		CreateMenu "[# LINE]",MENUMINI_LINES,menu
 
+		' Comando separato all'estrema destra della barra menu.
+		CreateMenu "[🛡 RUN AS ADMIN]",MENUMINI_RUNADMIN,menu
+
 		If quickenabled CheckMenu quickenable
 		If debugenabled CheckMenu debugenable
 		If threadedenabled CheckMenu threadedenable
@@ -6782,6 +6819,24 @@ Type TCodePlay
 			lockedpanel.invoke TOOLRUN
 		Else
 			activepanel.invoke TOOLRUN
+		EndIf
+	End Method
+
+	Method RunCodeAdmin()
+		If output Then output.Stop()
+		SaveAll()
+		If lockedpanel
+			lockedpanel.invoke TOOLRUNADMIN
+		Else
+			activepanel.invoke TOOLRUNADMIN
+		EndIf
+	End Method
+
+	Method LaunchBuiltAsAdmin()
+		If lockedpanel
+			lockedpanel.invoke TOOLLAUNCHADMIN
+		Else If activepanel
+			activepanel.invoke TOOLLAUNCHADMIN
 		EndIf
 	End Method
 
@@ -6885,6 +6940,10 @@ Type TCodePlay
 				If currentpanel Then currentpanel.invoke TOOLSAVE
 			Case MENUMINI_RUN
 				RunCode
+			Case MENUMINI_RUNADMIN
+				RunCodeAdmin
+			Case MENURUNADMINPOST
+				LaunchBuiltAsAdmin
 			Case MENUMINI_PANEL
 				ToggleRightPanel
 			Case MENUMINI_LINES
