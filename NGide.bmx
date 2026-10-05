@@ -45,6 +45,7 @@ Import brl.maxutil
 Import brl.stringbuilder
 Import "file64.o"
 Import "ngide_runadmin.c"
+Import "ngide_native.cpp"
 Incbin "splash.png"
 Incbin "default.language.ini"
 
@@ -53,7 +54,7 @@ Const DEFAULT_LANGUAGEPATH$ = "incbin::default.language.ini"
 Incbin "window_icon.png"
 
 Const IDE_NAME$="NGide"
-Const IDE_VERSION$="1.22 [2027]"
+Const IDE_VERSION$="1.23 [2027]"
 Const TIMER_FREQUENCY=15
 
 AppTitle = IDE_NAME + " " + IDE_VERSION
@@ -61,6 +62,7 @@ AppTitle = IDE_NAME + " " + IDE_VERSION
 Extern
 	Global _bbusew	'flag 'NT' segreto
 	Function NGideRunAsAdmin:Long(file$z, parameters$z, directory$z) = "ngide_run_as_admin"
+	Function NGideScanBmxOperators:Int(source$z, sourceLen:Int, positions:Int Ptr, maxPositions:Int) = "ngide_scan_bmx_operators"
 End Extern
 
 If Not _bbusew
@@ -4770,6 +4772,22 @@ Type TOpenCode Extends TToolPanel
 		If src.length = 0 Then Return
 		sci.SetStyle(op.color.red, op.color.green, op.color.blue, op.flags, 0, 0, TEXTAREA_CHARS)
 
+		' NGide 1.23: la scansione degli operatori ASCII avviene in C++.
+		' C++ restituisce soltanto le posizioni; Scintilla e gli stili restano qui.
+		Local positions:Int[] = New Int[src.length]
+		Local nativeCount:Int = -1
+		If positions.length > 0 Then
+			nativeCount = NGideScanBmxOperators(src, src.length, Varptr positions[0], positions.length)
+		EndIf
+
+		If nativeCount >= 0 Then
+			For Local i:Int = 0 Until nativeCount
+				sci.applyStyle(positions[i], 1, TEXTAREA_CHARS, 6)
+			Next
+			Return
+		EndIf
+
+		' Fallback 1.22 per sorgenti Unicode/non ASCII.
 		Local lsrc:String = src.ToLower()
 		Local inString:Int = False
 		Local inLineComment:Int = False
