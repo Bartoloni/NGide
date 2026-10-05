@@ -53,7 +53,7 @@ Const DEFAULT_LANGUAGEPATH$ = "incbin::default.language.ini"
 Incbin "window_icon.png"
 
 Const IDE_NAME$="NGide"
-Const IDE_VERSION$="1.21 [2027]"
+Const IDE_VERSION$="1.22 [2027]"
 Const TIMER_FREQUENCY=15
 
 AppTitle = IDE_NAME + " " + IDE_VERSION
@@ -3602,6 +3602,10 @@ Type TOutputPanel Extends TToolPanel	'usato da Build and Run
 		Close()
 	End Method
 
+	Method IsBusy:Int()
+		Return process <> Null And ProcessStatus(process)
+	End Method
+
 	Method Wait()
 		While process And process.status()
 			PollSystem
@@ -3683,15 +3687,31 @@ Type TOutputPanel Extends TToolPanel	'usato da Build and Run
 			host.DebugExit
 			host.SelectPanel Self
 
-			If err
+			' RUN AS ADMIN: bmk/ld puo scrivere avvisi su stderr anche se l'EXE
+			' e stato generato. Per questo comando il callback verifica direttamente
+			' l'eseguibile prodotto e, se presente, lo avvia tramite UAC.
+			' Copia e azzera subito lo stato post-build: evita che un RUN successivo
+			' possa ereditare accidentalmente il callback RUN AS ADMIN precedente.
+			Local completedPost:String = post$
+			Local completedTool:TTool = posttool
+			post$ = ""
+			posttool = Null
+
+			Local menuaction:Int = Int(completedPost)
+			If menuaction = MENURUNADMINPOST
+				' Non passare da host.OnMenu: richiamiamo direttamente il pannello
+				' sorgente che ha iniziato il build, come nella 1.21 FINAL funzionante.
+				If completedTool
+					completedTool.invoke TOOLLAUNCHADMIN
+				Else
+					host.LaunchBuiltAsAdmin()
+				EndIf
+			Else If err
 				host.ParseError err
 			Else
-				If post$
-					Local menuaction=Int(post)
+				If completedPost
 					If menuaction
-						host.OnMenu menuaction,posttool
-'					Else
-'						Execute post$,"","",False,0
+						host.OnMenu menuaction,completedTool
 					EndIf
 				Else
 					If host.options.hideoutput Close()
@@ -5211,7 +5231,7 @@ Type TOpenCode Extends TToolPanel
 				If arg cmd$:+" "+arg
 			EndIf
 			If runAdmin
-				host.execute cmd,"Building "+StripExt(StripDir(path)),String(MENURUNADMINPOST)
+				host.execute cmd,"Building "+StripExt(StripDir(path)),String(MENURUNADMINPOST),True,Self
 			Else
 				host.execute cmd,"Building "+StripExt(StripDir(path))	',exe$
 			EndIf
@@ -6411,7 +6431,7 @@ Type TCodePlay
 			Local panel:TGadget = CreatePanel(0,0,ClientWidth(splash),ClientHeight(splash),splash,0)
 			SetPanelColor panel,255,255,255;SetPanelPixmap panel, LoadPixmapPNG("incbin::splash.png"), PANELPIXMAP_FIT2
 			' Versione NGide visualizzata in alto a destra nella schermata di caricamento.
-			Local splashVersion:TGadget = CreateLabel("v1.21",ClientWidth(panel)-ScaledSize(82),ScaledSize(8),ScaledSize(72),ScaledSize(22),panel,LABEL_RIGHT)
+			Local splashVersion:TGadget = CreateLabel("v1.22",ClientWidth(panel)-ScaledSize(82),ScaledSize(8),ScaledSize(72),ScaledSize(22),panel,LABEL_RIGHT)
 			SetGadgetColor splashVersion,255,255,255,False
 			' Barra di caricamento personalizzata NGide: sfondo scuro + riempimento azzurro.
 			' Non usa CreateProgBar, quindi il colore non viene imposto dal tema di Windows.
@@ -6823,7 +6843,11 @@ Type TCodePlay
 	End Method
 
 	Method RunCodeAdmin()
-		If output Then output.Stop()
+		' Non interrompere una compilazione/esecuzione gia in corso con un secondo click.
+		If output And output.IsBusy()
+			Notify "RUN AS ADMIN: attendere il termine del processo in corso."
+			Return
+		EndIf
 		SaveAll()
 		If lockedpanel
 			lockedpanel.invoke TOOLRUNADMIN
@@ -6943,7 +6967,11 @@ Type TCodePlay
 			Case MENUMINI_RUNADMIN
 				RunCodeAdmin
 			Case MENURUNADMINPOST
-				LaunchBuiltAsAdmin
+				If tool Then
+					tool.invoke TOOLLAUNCHADMIN
+				Else
+					LaunchBuiltAsAdmin
+				EndIf
 			Case MENUMINI_PANEL
 				ToggleRightPanel
 			Case MENUMINI_LINES
